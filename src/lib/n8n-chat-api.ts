@@ -1,4 +1,4 @@
-import { N8N_CHAT_WEBHOOK_URL } from "./constants";
+import { N8N_CHAT_WEBHOOK_URL, N8N_WEBHOOK_AUTH } from "./constants";
 
 export interface ChatMetadata {
   landlordId?: string | null;
@@ -30,9 +30,16 @@ export async function sendChatMessage(
     metadata,
   };
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (N8N_WEBHOOK_AUTH) {
+    headers["Authorization"] = `Basic ${N8N_WEBHOOK_AUTH}`;
+  }
+
   const res = await fetch(N8N_CHAT_WEBHOOK_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -53,9 +60,16 @@ export async function loadPreviousSession(
   };
 
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (N8N_WEBHOOK_AUTH) {
+      headers["Authorization"] = `Basic ${N8N_WEBHOOK_AUTH}`;
+    }
+
     const res = await fetch(N8N_CHAT_WEBHOOK_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload),
     });
 
