@@ -23,9 +23,14 @@ export function useMessageLimit(sessionId: string) {
     });
   }, [sessionId]);
 
+  const resetCount = useCallback(() => {
+    localStorage.removeItem(`${STORAGE_KEY}-${sessionId}`);
+    setMessageCount(0);
+  }, [sessionId]);
+
   const canSendMessage = messageCount < MESSAGE_LIMIT;
   const isLastMessage = messageCount === MESSAGE_LIMIT - 1;
   const isLimitReached = messageCount >= MESSAGE_LIMIT;
 
-  return { messageCount, canSendMessage, isLastMessage, isLimitReached, incrementCount };
+  return { messageCount, canSendMessage, isLastMessage, isLimitReached, incrementCount, resetCount };
 }

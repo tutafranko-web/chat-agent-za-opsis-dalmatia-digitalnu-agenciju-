@@ -9,7 +9,7 @@ import { useChat } from "@/hooks/use-chat";
 import { MESSAGE_LIMIT } from "@/lib/constants";
 
 export function Chatbot() {
-  const { messages, isLoading, sendMessage, canSendMessage, isLimitReached, messageCount } =
+  const { messages, isLoading, sendMessage, canSendMessage, isLimitReached, messageCount, resetCount } =
     useChat();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -26,9 +26,16 @@ export function Chatbot() {
           Opsis Dalmatia - Tourist Assistant
         </h2>
         <p className="text-xs text-muted-foreground">
-          {isLimitReached
-            ? "Session complete - Thank you!"
-            : `${MESSAGE_LIMIT - messageCount} messages remaining`}
+          {isLimitReached ? (
+            <button
+              onClick={resetCount}
+              className="underline hover:no-underline cursor-pointer"
+            >
+              Session complete — Start new session
+            </button>
+          ) : (
+            `${MESSAGE_LIMIT - messageCount} messages remaining`
+          )}
         </p>
       </div>
 

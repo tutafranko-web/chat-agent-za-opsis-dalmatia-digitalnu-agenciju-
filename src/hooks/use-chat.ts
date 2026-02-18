@@ -29,7 +29,7 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId] = useState(getOrCreateSessionId);
   const landlordId = useLandlordId();
-  const { messageCount, canSendMessage, isLastMessage, isLimitReached, incrementCount } =
+  const { messageCount, canSendMessage, isLastMessage, isLimitReached, incrementCount, resetCount } =
     useMessageLimit(sessionId);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -58,7 +58,6 @@ export function useChat() {
       };
       setMessages((prev) => [...prev, userMsg]);
       setIsLoading(true);
-      incrementCount();
 
       try {
         const response = await sendChatMessage(sessionId, text.trim(), {
@@ -66,6 +65,8 @@ export function useChat() {
           messageCount: messageCount + 1,
           isLastMessage,
         });
+
+        incrementCount();
 
         const botMsg: ChatMessage = {
           id: uuidv4(),
@@ -103,6 +104,7 @@ export function useChat() {
     canSendMessage,
     isLimitReached,
     messageCount,
+    resetCount,
     cleanup,
   };
 }
