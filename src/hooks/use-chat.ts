@@ -15,23 +15,23 @@ export interface ChatMessage {
 
 const SESSION_KEY = "opsis-chat-session";
 
-const GREETING = `Welcome! I'm your personal tourist assistant for Split and Dalmatia 🌊
+const GREETING = `Welcome to Opsis Dalmatia! 🌊
+Your personal activity concierge for the Split & Dalmatia region.
 
-CHOOSE ONLY THE NUMBER IN FRONT IF YOU WANT TO SEARCH!
-You have 15 messages with the chatbot so use them wisely.
-I can speak all languages but prefer English.
+Choose a category (type the number):
 
 ━━━━━━━━━━━━━━━━━━━━━━━
-1️⃣  Sailing & Boat Tours
-2️⃣  ATV & Off-Road Adventures
-3️⃣  City & Walking Tours
-4️⃣  Water Sports (Kayak, Paddleboard...)
-5️⃣  Day Trips & Island Excursions
-6️⃣  Nightlife & Entertainment
-7️⃣  Other Activities
+1️⃣  Nautical & Water Activities
+2️⃣  Adrenaline & Adventure 🏍️
+3️⃣  Transportation Rentals
+4️⃣  Land Tours & Guided Experiences
+5️⃣  Nightlife & Entertainment
+6️⃣  Quiz Results (paste your quiz score)
+7️⃣  Show All Activities
 ━━━━━━━━━━━━━━━━━━━━━━━
 
-Type a number to start! 👇`;
+Type a number → see specific activities → pick one to book! 👇
+You have 15 messages. I speak all languages.`;
 
 export function useChat() {
   // Start with empty string — populated in useEffect (client-only)
