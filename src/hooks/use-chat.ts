@@ -24,6 +24,24 @@ function getOrCreateSessionId(): string {
   return id;
 }
 
+const GREETING = `Welcome! I'm your personal tourist assistant for Split and Dalmatia 🌊
+
+CHOOSE ONLY THE NUMBER IN FRONT IF YOU WANT TO SEARCH!
+You have 15 messages with the chatbot so use them wisely.
+I can speak all languages but prefer English.
+
+━━━━━━━━━━━━━━━━━━━━━━━
+1️⃣  Sailing & Boat Tours
+2️⃣  ATV & Off-Road Adventures
+3️⃣  City & Walking Tours
+4️⃣  Water Sports (Kayak, Paddleboard...)
+5️⃣  Day Trips & Island Excursions
+6️⃣  Nightlife & Entertainment
+7️⃣  Other Activities
+━━━━━━━━━━━━━━━━━━━━━━━
+
+Type a number to start! 👇`;
+
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,8 +56,7 @@ export function useChat() {
       const greeting: ChatMessage = {
         id: uuidv4(),
         role: "bot",
-        content:
-          "Welcome! I'm your personal tourist assistant for Split and Dalmatia. How can I help you plan your activities today?",
+        content: GREETING,
         timestamp: new Date(),
       };
       setMessages([greeting]);
@@ -91,6 +108,12 @@ export function useChat() {
     [canSendMessage, isLoading, sessionId, landlordId, messageCount, isLastMessage, incrementCount]
   );
 
+  const resetSession = useCallback(() => {
+    sessionStorage.removeItem(SESSION_KEY);
+    resetCount();
+    window.location.reload();
+  }, [resetCount]);
+
   const cleanup = useCallback(() => {
     if (abortRef.current) {
       abortRef.current.abort();
@@ -104,7 +127,7 @@ export function useChat() {
     canSendMessage,
     isLimitReached,
     messageCount,
-    resetCount,
+    resetSession,
     cleanup,
   };
 }
