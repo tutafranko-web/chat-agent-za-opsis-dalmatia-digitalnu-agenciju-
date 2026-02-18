@@ -2,7 +2,6 @@
 
 import { useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { useChat } from "@/hooks/use-chat";
@@ -39,7 +38,7 @@ export function Chatbot() {
         </p>
       </div>
 
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4">
         <div className="space-y-1">
           {messages.map((msg) => (
             <ChatMessage key={msg.id} message={msg} />
@@ -56,7 +55,7 @@ export function Chatbot() {
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       <ChatInput
         onSend={sendMessage}
