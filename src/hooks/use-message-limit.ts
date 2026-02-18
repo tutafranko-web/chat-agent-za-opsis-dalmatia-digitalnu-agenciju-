@@ -9,6 +9,7 @@ export function useMessageLimit(sessionId: string) {
   const [messageCount, setMessageCount] = useState(0);
 
   useEffect(() => {
+    if (!sessionId) return; // Wait until client session ID is ready
     const stored = localStorage.getItem(`${STORAGE_KEY}-${sessionId}`);
     if (stored) {
       setMessageCount(parseInt(stored, 10));

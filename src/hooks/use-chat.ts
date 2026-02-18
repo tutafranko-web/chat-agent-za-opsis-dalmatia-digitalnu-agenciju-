@@ -15,15 +15,6 @@ export interface ChatMessage {
 
 const SESSION_KEY = "opsis-chat-session";
 
-function getOrCreateSessionId(): string {
-  if (typeof window === "undefined") return uuidv4();
-  const existing = sessionStorage.getItem(SESSION_KEY);
-  if (existing) return existing;
-  const id = uuidv4();
-  sessionStorage.setItem(SESSION_KEY, id);
-  return id;
-}
-
 const GREETING = `Welcome! I'm your personal tourist assistant for Split and Dalmatia 🌊
 
 CHOOSE ONLY THE NUMBER IN FRONT IF YOU WANT TO SEARCH!
@@ -43,14 +34,29 @@ I can speak all languages but prefer English.
 Type a number to start! 👇`;
 
 export function useChat() {
+  // Start with empty string — populated in useEffect (client-only)
+  // This avoids SSR/client hydration mismatch from sessionStorage access
+  const [sessionId, setSessionId] = useState<string>("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId] = useState(getOrCreateSessionId);
   const landlordId = useLandlordId();
   const { messageCount, canSendMessage, isLastMessage, isLimitReached, incrementCount, resetCount } =
     useMessageLimit(sessionId);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Initialize session ID on client only (avoids SSR mismatch)
+  useEffect(() => {
+    const existing = sessionStorage.getItem(SESSION_KEY);
+    if (existing) {
+      setSessionId(existing);
+    } else {
+      const id = uuidv4();
+      sessionStorage.setItem(SESSION_KEY, id);
+      setSessionId(id);
+    }
+  }, []);
+
+  // Show greeting once on mount
   useEffect(() => {
     if (messages.length === 0) {
       const greeting: ChatMessage = {
@@ -65,7 +71,8 @@ export function useChat() {
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!text.trim() || !canSendMessage || isLoading) return;
+      // Don't send if no session yet, no text, limit reached, or already loading
+      if (!sessionId || !text.trim() || !canSendMessage || isLoading) return;
 
       const userMsg: ChatMessage = {
         id: uuidv4(),
@@ -92,7 +99,7 @@ export function useChat() {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, botMsg]);
-      } catch (err) {
+      } catch {
         const errorMsg: ChatMessage = {
           id: uuidv4(),
           role: "bot",
@@ -105,7 +112,7 @@ export function useChat() {
         setIsLoading(false);
       }
     },
-    [canSendMessage, isLoading, sessionId, landlordId, messageCount, isLastMessage, incrementCount]
+    [sessionId, canSendMessage, isLoading, landlordId, messageCount, isLastMessage, incrementCount]
   );
 
   const resetSession = useCallback(() => {
