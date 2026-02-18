@@ -351,6 +351,15 @@ export function useChat() {
       }
 
       // ── STATE: BOOKING (full conversation with n8n AI) ────────────────
+      // "0", "back", or "menu" → exit booking, return to main menu
+      if (trimmed === "0" || trimmed.toLowerCase() === "back" || trimmed.toLowerCase() === "menu") {
+        setMessages((prev) => [
+          ...prev,
+          { id: uuidv4(), role: "bot", content: GREETING, timestamp: new Date() },
+        ]);
+        setChatPhase("menu");
+        return;
+      }
       await callN8n(trimmed);
     },
     [sessionId, chatPhase, canSendMessage, isLoading, incrementCount, callN8n]
