@@ -35,9 +35,10 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
         disabled={disabled}
         placeholder={placeholder || "Type your message..."}
         className="flex-1"
+        aria-label="Chat message"
         autoFocus
       />
-      <Button onClick={handleSend} disabled={disabled || !value.trim()} size="sm">
+      <Button onClick={handleSend} disabled={disabled || !value.trim()} size="default" aria-label="Send message" className="min-h-[44px] min-w-[44px]">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="18"
@@ -48,6 +49,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
+          aria-hidden="true"
         >
           <line x1="22" y1="2" x2="11" y2="13" />
           <polygon points="22 2 15 22 11 13 2 9 22 2" />

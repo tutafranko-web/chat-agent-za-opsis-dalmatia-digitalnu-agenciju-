@@ -53,6 +53,7 @@ export function LandingAnimation({ onComplete }: LandingAnimationProps) {
       <button
         onClick={onComplete}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 text-white/60 text-sm hover:text-white transition-colors animate-pulse"
+        aria-label="Skip animation"
       >
         Click anywhere to continue
       </button>

@@ -113,6 +113,8 @@ export function ShaderAnimation() {
         overflow: "hidden",
         display: "block",
       }}
+      aria-hidden="true"
+      role="presentation"
     />
   )
 }

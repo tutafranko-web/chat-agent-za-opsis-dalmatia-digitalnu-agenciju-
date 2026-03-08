@@ -29,6 +29,7 @@ export function Chatbot() {
             <button
               onClick={resetSession}
               className="underline hover:no-underline cursor-pointer"
+              aria-label="Start new chat session"
             >
               Session complete — Start new session
             </button>
