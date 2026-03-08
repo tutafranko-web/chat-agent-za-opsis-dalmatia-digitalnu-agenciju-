@@ -22,7 +22,7 @@ export function ShaderAnimation() {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const gl = canvas.getContext("webgl", { antialias: true })
+    const gl = canvas.getContext("webgl")
     if (!gl) return
 
     const vertexSource = `
@@ -74,7 +74,7 @@ export function ShaderAnimation() {
     let time = 1.0
 
     const resize = () => {
-      const dpr = window.devicePixelRatio
+      const dpr = Math.min(window.devicePixelRatio, 2)
       const w = canvas.clientWidth
       const h = canvas.clientHeight
       canvas.width = w * dpr
@@ -85,14 +85,17 @@ export function ShaderAnimation() {
     resize()
     window.addEventListener("resize", resize)
 
-    const animate = () => {
+    let lastFrame = 0
+    const animate = (now: number) => {
+      animationRef.current = requestAnimationFrame(animate)
+      if (now - lastFrame < 33) return
+      lastFrame = now
       time += 0.05
       gl.uniform1f(timeLoc, time)
       gl.uniform2f(resLoc, canvas.width, canvas.height)
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-      animationRef.current = requestAnimationFrame(animate)
     }
-    animate()
+    requestAnimationFrame(animate)
 
     return () => {
       cancelAnimationFrame(animationRef.current)
