@@ -36,7 +36,6 @@ export function LandingAnimation({ onComplete }: LandingAnimationProps) {
       className={`relative w-full h-screen transition-opacity duration-1000 ${
         fadeOut ? "opacity-0" : "opacity-100"
       }`}
-      onClick={onComplete}
     >
       <ShaderAnimation />
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">

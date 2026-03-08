@@ -22,7 +22,7 @@ export function ShaderAnimation() {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const gl = canvas.getContext("webgl", { antialias: true })
+    const gl = canvas.getContext("webgl", { antialias: false, powerPreference: "low-power" })
     if (!gl) return
 
     const vertexSource = `
