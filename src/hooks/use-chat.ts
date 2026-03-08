@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-const uuidv4 = () => crypto.randomUUID();
+import { v4 as uuidv4 } from "uuid";
 import { sendChatMessage } from "@/lib/n8n-chat-api";
 import { useMessageLimit } from "./use-message-limit";
 import { useLandlordId } from "./use-landlord-id";
