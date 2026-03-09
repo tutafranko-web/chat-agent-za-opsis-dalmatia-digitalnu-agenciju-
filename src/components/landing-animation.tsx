@@ -1,15 +1,7 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-
-const ShaderAnimation = dynamic(
-  () =>
-    import("@/components/ui/shader-animation").then((mod) => ({
-      default: mod.ShaderAnimation,
-    })),
-  { ssr: false }
-);
+import { ShaderAnimation } from "@/components/ui/shader-animation";
 
 interface LandingAnimationProps {
   onComplete: () => void;
