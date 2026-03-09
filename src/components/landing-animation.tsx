@@ -20,8 +20,8 @@ export function LandingAnimation({ onComplete }: LandingAnimationProps) {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    const textTimer = setTimeout(() => setShowText(true), 200);
-    const fadeTimer = setTimeout(() => setFadeOut(true), 2000);
+    const textTimer = setTimeout(() => setShowText(true), 100);
+    const fadeTimer = setTimeout(() => setFadeOut(true), 1000);
     const completeTimer = setTimeout(() => onComplete(), 3000);
 
     return () => {
