@@ -21,14 +21,6 @@ export function ShaderAnimation({ stopped }: ShaderAnimationProps) {
       aria-hidden="true"
       role="presentation"
     >
-      <style>{`
-        @keyframes ring-expand {
-          0%   { transform: scale(0.2); opacity: 0; }
-          15%  { opacity: 1; }
-          80%  { opacity: 0.6; }
-          100% { transform: scale(2.5); opacity: 0; }
-        }
-      `}</style>
       {rings.map((ring, i) => (
         <div
           key={i}
@@ -39,7 +31,8 @@ export function ShaderAnimation({ stopped }: ShaderAnimationProps) {
             width: "60vmin",
             height: "60vmin",
             borderRadius: "50%",
-            background: `radial-gradient(circle, transparent 35%, ${ring.color} 50%, transparent 65%)`,
+            border: `2px solid ${ring.color}`,
+            background: "transparent",
             animation: "ring-expand 3s ease-out infinite",
             animationDelay: ring.delay,
             animationPlayState: stopped ? "paused" : "running",
