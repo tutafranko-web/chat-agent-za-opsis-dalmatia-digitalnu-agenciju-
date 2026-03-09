@@ -8,16 +8,12 @@ interface LandingAnimationProps {
 }
 
 export function LandingAnimation({ onComplete }: LandingAnimationProps) {
-  const [showText, setShowText] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    const textTimer = setTimeout(() => setShowText(true), 100);
     const fadeTimer = setTimeout(() => setFadeOut(true), 1000);
     const completeTimer = setTimeout(() => onComplete(), 3000);
-
     return () => {
-      clearTimeout(textTimer);
       clearTimeout(fadeTimer);
       clearTimeout(completeTimer);
     };
@@ -33,9 +29,8 @@ export function LandingAnimation({ onComplete }: LandingAnimationProps) {
       <ShaderAnimation stopped={fadeOut} />
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
         <h1
-          className={`text-center text-4xl sm:text-5xl md:text-7xl font-semibold tracking-tighter text-white transition-all duration-1000 ${
-            showText ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
+          className="text-center text-4xl sm:text-5xl md:text-7xl font-semibold tracking-tighter text-white"
+          style={{ animation: "text-appear 1000ms 100ms ease both" }}
         >
           The future of tourism
           <br />
