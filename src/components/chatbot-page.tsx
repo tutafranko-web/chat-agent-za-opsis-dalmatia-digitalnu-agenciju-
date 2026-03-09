@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect, Suspense } from "react";
+import { useState, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { LandingAnimation } from "@/components/landing-animation";
 
-// Split Chatbot into a separate chunk — not needed for first 3 seconds
 const Chatbot = dynamic(
   () => import("@/components/chatbot").then((m) => ({ default: m.Chatbot })),
   { ssr: false }
@@ -15,11 +14,6 @@ export function ChatbotPage() {
 
   const handleAnimationComplete = useCallback(() => {
     setPhase("chat");
-  }, []);
-
-  // Preload Chatbot chunk in background during animation so it's ready instantly
-  useEffect(() => {
-    import("@/components/chatbot");
   }, []);
 
   return (
