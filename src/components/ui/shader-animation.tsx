@@ -14,9 +14,20 @@ function createShader(gl: WebGLRenderingContext, type: number, source: string): 
   return shader
 }
 
-export function ShaderAnimation() {
+interface ShaderAnimationProps {
+  stopped?: boolean
+}
+
+export function ShaderAnimation({ stopped }: ShaderAnimationProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationRef = useRef<number>(0)
+  const stoppedRef = useRef(false)
+
+  // Stop the rAF loop immediately when stopped prop becomes true
+  useEffect(() => {
+    stoppedRef.current = !!stopped
+    if (stopped) cancelAnimationFrame(animationRef.current)
+  }, [stopped])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -88,6 +99,7 @@ export function ShaderAnimation() {
     let lastFrame = 0
     const animate = (now: number) => {
       animationRef.current = requestAnimationFrame(animate)
+      if (stoppedRef.current) return
       if (now - lastFrame < 33) return
       lastFrame = now
       time += 0.05

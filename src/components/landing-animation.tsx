@@ -38,7 +38,7 @@ export function LandingAnimation({ onComplete }: LandingAnimationProps) {
       }`}
       onClick={onComplete}
     >
-      <ShaderAnimation />
+      <ShaderAnimation stopped={fadeOut} />
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
         <h1
           className={`text-center text-4xl sm:text-5xl md:text-7xl font-semibold tracking-tighter text-white transition-all duration-1000 ${
