@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const N8N_URL = process.env.N8N_CHAT_WEBHOOK_URL || "";
 const N8N_AUTH = process.env.N8N_WEBHOOK_AUTH || "";
+const N8N_OPSIS_KEY = process.env.N8N_OPSIS_KEY || "";
 
 export async function POST(req: NextRequest) {
   if (!N8N_URL) {
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
   };
   if (N8N_AUTH) {
     headers["Authorization"] = `Basic ${N8N_AUTH}`;
+  }
+  if (N8N_OPSIS_KEY) {
+    headers["x-opsis-key"] = N8N_OPSIS_KEY;
   }
 
   const controller = new AbortController();
