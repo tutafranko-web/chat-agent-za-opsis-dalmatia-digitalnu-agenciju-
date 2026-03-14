@@ -22,7 +22,7 @@ export function Chatbot() {
     <Card className="flex flex-col w-full max-w-2xl mx-auto h-[calc(100vh-2rem)] md:h-[600px] border-border bg-background/80 backdrop-blur-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-border bg-card">
         <h2 className="text-sm font-semibold text-foreground">
-          Opsis Dalmatia - Tourist Assistant
+          Opsis Dalmatia — AI Concierge
         </h2>
         <p className="text-xs text-muted-foreground">
           {isLimitReached ? (
