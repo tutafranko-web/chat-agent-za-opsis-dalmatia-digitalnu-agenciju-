@@ -39,7 +39,7 @@ export function Chatbot() {
         </p>
       </div>
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4" role="log" aria-live="polite" aria-label="Chat messages">
         <div className="space-y-1">
           {messages.map((msg) => (
             <ChatMessage key={msg.id} message={msg} />

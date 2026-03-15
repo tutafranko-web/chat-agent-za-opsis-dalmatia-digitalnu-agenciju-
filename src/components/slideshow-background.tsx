@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 const LEFT_PHOTOS = [
   { src: "/activities/blue-cave.jpg", alt: "Blue Cave" },
   { src: "/activities/atv-safari.jpg", alt: "ATV safari" },
@@ -21,7 +23,6 @@ function VerticalColumn({
   direction: "up" | "down";
   side: "left" | "right";
 }) {
-  // Duplicate for seamless loop
   const doubled = [...photos, ...photos];
 
   return (
@@ -38,14 +39,17 @@ function VerticalColumn({
         }}
       >
         {doubled.map((photo, i) => (
-          <img
-            key={i}
-            src={photo.src}
-            alt={photo.alt}
-            className="w-full flex-shrink-0 object-cover"
-            style={{ height: "50vh" }}
-            loading={i < photos.length ? "eager" : "lazy"}
-          />
+          <div key={i} className="relative w-full flex-shrink-0" style={{ height: "50vh" }}>
+            <Image
+              src={photo.src}
+              alt={photo.alt}
+              fill
+              sizes="(min-width: 768px) 25vw, 0px"
+              className="object-cover"
+              quality={75}
+              priority={i < photos.length}
+            />
+          </div>
         ))}
       </div>
     </div>

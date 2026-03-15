@@ -303,6 +303,7 @@ export function useChat() {
       if (!sessionId || !text.trim() || !canSendMessage || isLoading) return;
 
       const trimmed = text.trim();
+      if (trimmed.length > 2000) return;
       const num = parseInt(trimmed, 10);
       const isNum = !isNaN(num) && String(num) === trimmed;
 
