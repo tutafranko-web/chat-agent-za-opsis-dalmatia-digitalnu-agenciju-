@@ -23,7 +23,23 @@ export function ChatbotPage() {
       )}
       {phase === "chat" && (
         <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-in fade-in duration-700">
-          <Suspense fallback={<div className="text-muted-foreground">Loading...</div>}>
+          <Suspense fallback={
+            <div className="w-full max-w-2xl mx-auto h-[calc(100vh-2rem)] md:h-[600px] rounded-xl border border-border bg-background/80 backdrop-blur-sm overflow-hidden flex flex-col">
+              <div className="px-4 py-3 border-b border-border bg-card">
+                <div className="h-4 w-48 bg-muted rounded animate-pulse" />
+                <div className="h-3 w-32 bg-muted rounded animate-pulse mt-1" />
+              </div>
+              <div className="flex-1 p-4">
+                <div className="bg-card border border-border rounded-2xl rounded-bl-sm px-4 py-3 max-w-[85%]">
+                  <div className="space-y-2">
+                    <div className="h-3 w-56 bg-muted rounded animate-pulse" />
+                    <div className="h-3 w-48 bg-muted rounded animate-pulse" />
+                    <div className="h-3 w-40 bg-muted rounded animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          }>
             <Chatbot />
           </Suspense>
           <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">

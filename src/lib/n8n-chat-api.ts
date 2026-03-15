@@ -19,8 +19,10 @@ interface ChatResponse {
 
 function cleanResponse(text: string): string {
   return text
-    .replace(/=== \[MESSAGE LIMIT\] ===[\s\S]*?=== \[END MESSAGE LIMIT\] ===/g, "")
-    .replace(/\[BOOKING_DATA\][\s\S]*?\[\/BOOKING_DATA\]/g, "")
+    // Strip MESSAGE LIMIT blocks (with any surrounding wrapper chars like ¨)
+    .replace(/[¨"]*===\s*\[MESSAGE LIMIT\]\s*===[\s\S]*?===\s*\[END MESSAGE LIMIT\]\s*===[¨"]*/g, "")
+    // Strip BOOKING_DATA tags and everything after them
+    .replace(/\[BOOKING_DATA\][\s\S]*/g, "")
     .trim();
 }
 
