@@ -1,76 +1,55 @@
 "use client"
 
-export function ShaderAnimation() {
+function LineLayer({
+  angle,
+  color,
+  gap,
+  speed,
+  direction,
+}: {
+  angle: string;
+  color: string;
+  gap: number;
+  speed: number;
+  direction: "up" | "down" | "left" | "right";
+}) {
+  const translate = {
+    up: `translateY(-50%)`,
+    down: `translateY(50%)`,
+    left: `translateX(-50%)`,
+    right: `translateX(50%)`,
+  }[direction];
+
   return (
-    <div className="w-full h-full absolute inset-0 bg-black overflow-hidden">
-      {/* Layer 1: Red/orange diagonal lines moving left */}
+    <div className="absolute inset-0 overflow-hidden">
       <div
-        className="absolute inset-0"
+        className="absolute will-change-transform"
         style={{
-          background: `repeating-linear-gradient(
-            -45deg,
-            transparent,
-            transparent 3px,
-            rgba(255, 60, 40, 0.15) 3px,
-            rgba(255, 60, 40, 0.15) 4px
-          )`,
-          backgroundSize: "200% 200%",
-          animation: "shader-move-1 8s linear infinite",
-        }}
-      />
-      {/* Layer 2: Cyan horizontal lines moving up */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `repeating-linear-gradient(
-            0deg,
-            transparent,
-            transparent 5px,
-            rgba(0, 200, 220, 0.12) 5px,
-            rgba(0, 200, 220, 0.12) 6px
-          )`,
-          backgroundSize: "100% 200%",
-          animation: "shader-move-2 6s linear infinite",
-        }}
-      />
-      {/* Layer 3: Purple diagonal lines moving right */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `repeating-linear-gradient(
-            45deg,
-            transparent,
-            transparent 4px,
-            rgba(160, 60, 255, 0.13) 4px,
-            rgba(160, 60, 255, 0.13) 5px
-          )`,
-          backgroundSize: "200% 200%",
-          animation: "shader-move-3 10s linear infinite",
-        }}
-      />
-      {/* Layer 4: Warm glow center */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: "radial-gradient(ellipse at center, rgba(255,140,0,0.08) 0%, transparent 70%)",
-          animation: "shader-pulse 4s ease-in-out infinite alternate",
-        }}
-      />
-      {/* Layer 5: Vertical thin lines drifting */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `repeating-linear-gradient(
-            90deg,
-            transparent,
-            transparent 8px,
-            rgba(0, 200, 80, 0.08) 8px,
-            rgba(0, 200, 80, 0.08) 9px
-          )`,
-          backgroundSize: "200% 100%",
-          animation: "shader-move-1 12s linear infinite reverse",
+          inset: "-100%",
+          background: `repeating-linear-gradient(${angle}, transparent, transparent ${gap}px, ${color} ${gap}px, ${color} ${gap + 1.5}px)`,
+          animation: `shader-drift ${speed}s linear infinite`,
+          ["--shader-translate" as string]: translate,
         }}
       />
     </div>
-  )
+  );
+}
+
+export function ShaderAnimation() {
+  return (
+    <div className="w-full h-full absolute inset-0 bg-black overflow-hidden">
+      <LineLayer angle="-45deg" color="rgba(255, 50, 30, 0.35)" gap={6} speed={8} direction="left" />
+      <LineLayer angle="0deg" color="rgba(0, 180, 220, 0.3)" gap={8} speed={6} direction="up" />
+      <LineLayer angle="45deg" color="rgba(160, 50, 255, 0.3)" gap={7} speed={10} direction="right" />
+      <LineLayer angle="90deg" color="rgba(0, 200, 80, 0.2)" gap={10} speed={12} direction="down" />
+      {/* Center glow */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "radial-gradient(ellipse at center, rgba(255,140,0,0.15) 0%, transparent 60%)",
+          animation: "shader-pulse 3s ease-in-out infinite alternate",
+        }}
+      />
+    </div>
+  );
 }
