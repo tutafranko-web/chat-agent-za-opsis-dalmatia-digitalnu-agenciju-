@@ -11,8 +11,15 @@ export function LandingAnimation({ onComplete }: LandingAnimationProps) {
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    const fadeTimer = setTimeout(() => setFadeOut(true), 1000);
-    const completeTimer = setTimeout(() => onComplete(), 3000);
+    // Skip animation on repeat visits
+    if (sessionStorage.getItem("opsis-animation-seen")) {
+      onComplete();
+      return;
+    }
+    sessionStorage.setItem("opsis-animation-seen", "1");
+
+    const fadeTimer = setTimeout(() => setFadeOut(true), 500);
+    const completeTimer = setTimeout(() => onComplete(), 1500);
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(completeTimer);

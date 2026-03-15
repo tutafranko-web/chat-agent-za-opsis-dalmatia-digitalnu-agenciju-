@@ -17,6 +17,13 @@ interface ChatResponse {
   [key: string]: unknown;
 }
 
+function cleanResponse(text: string): string {
+  return text
+    .replace(/=== \[MESSAGE LIMIT\] ===[\s\S]*?=== \[END MESSAGE LIMIT\] ===/g, "")
+    .replace(/\[BOOKING_DATA\][\s\S]*?\[\/BOOKING_DATA\]/g, "")
+    .trim();
+}
+
 export async function sendChatMessage(
   sessionId: string,
   message: string,
@@ -40,7 +47,8 @@ export async function sendChatMessage(
   }
 
   const data = await res.json();
-  return (data.output || data.text || JSON.stringify(data)) as string;
+  const raw = (data.output || data.text || JSON.stringify(data)) as string;
+  return cleanResponse(raw);
 }
 
 export async function loadPreviousSession(
