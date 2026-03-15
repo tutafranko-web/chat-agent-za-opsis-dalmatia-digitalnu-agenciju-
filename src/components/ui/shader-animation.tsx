@@ -1,56 +1,16 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-
-declare global {
-  interface Window {
-    THREE: any
-  }
-}
+import * as THREE from "three"
 
 export function ShaderAnimation() {
   const containerRef = useRef<HTMLDivElement>(null)
-  const sceneRef = useRef<{
-    camera: any
-    scene: any
-    renderer: any
-    uniforms: any
-    animationId: number | null
-  }>({
-    camera: null,
-    scene: null,
-    renderer: null,
-    uniforms: null,
-    animationId: null,
-  })
+  const animationIdRef = useRef<number | null>(null)
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
 
   useEffect(() => {
-    const script = document.createElement("script")
-    script.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/89/three.min.js"
-    script.onload = () => {
-      if (containerRef.current && window.THREE) {
-        initThreeJS()
-      }
-    }
-    document.head.appendChild(script)
+    if (!containerRef.current) return
 
-    return () => {
-      if (sceneRef.current.animationId) {
-        cancelAnimationFrame(sceneRef.current.animationId)
-      }
-      if (sceneRef.current.renderer) {
-        sceneRef.current.renderer.dispose()
-      }
-      if (script.parentNode) {
-        document.head.removeChild(script)
-      }
-    }
-  }, [])
-
-  const initThreeJS = () => {
-    if (!containerRef.current || !window.THREE) return
-
-    const THREE = window.THREE
     const container = containerRef.current
     container.innerHTML = ""
 
@@ -72,9 +32,6 @@ export function ShaderAnimation() {
     `
 
     const fragmentShader = `
-      #define TWO_PI 6.2831853072
-      #define PI 3.14159265359
-
       precision highp float;
       uniform vec2 resolution;
       uniform float time;
@@ -82,13 +39,6 @@ export function ShaderAnimation() {
       float random (in float x) {
           return fract(sin(x)*1e4);
       }
-      float random (vec2 st) {
-          return fract(sin(dot(st.xy,
-                               vec2(12.9898,78.233)))*
-              43758.5453123);
-      }
-
-      varying vec2 vUv;
 
       void main(void) {
         vec2 uv = (gl_FragCoord.xy * 2.0 - resolution.xy) / min(resolution.x, resolution.y);
@@ -124,14 +74,7 @@ export function ShaderAnimation() {
     const renderer = new THREE.WebGLRenderer()
     renderer.setPixelRatio(window.devicePixelRatio)
     container.appendChild(renderer.domElement)
-
-    sceneRef.current = {
-      camera,
-      scene,
-      renderer,
-      uniforms,
-      animationId: null,
-    }
+    rendererRef.current = renderer
 
     const onWindowResize = () => {
       const rect = container.getBoundingClientRect()
@@ -141,16 +84,26 @@ export function ShaderAnimation() {
     }
 
     onWindowResize()
-    window.addEventListener("resize", onWindowResize, false)
+    window.addEventListener("resize", onWindowResize)
 
     const animate = () => {
-      sceneRef.current.animationId = requestAnimationFrame(animate)
+      animationIdRef.current = requestAnimationFrame(animate)
       uniforms.time.value += 0.05
       renderer.render(scene, camera)
     }
 
     animate()
-  }
+
+    return () => {
+      window.removeEventListener("resize", onWindowResize)
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current)
+      }
+      renderer.dispose()
+      geometry.dispose()
+      material.dispose()
+    }
+  }, [])
 
   return (
     <div
