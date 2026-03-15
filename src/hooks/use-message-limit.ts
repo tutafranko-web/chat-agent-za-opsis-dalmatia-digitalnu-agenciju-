@@ -1,20 +1,18 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { MESSAGE_LIMIT } from "@/lib/constants";
 
 const STORAGE_KEY = "opsis-chat-count";
 
-export function useMessageLimit(sessionId: string) {
-  const [messageCount, setMessageCount] = useState(0);
+function getStoredCount(sessionId: string): number {
+  if (!sessionId || typeof window === "undefined") return 0;
+  const stored = localStorage.getItem(`${STORAGE_KEY}-${sessionId}`);
+  return stored ? parseInt(stored, 10) : 0;
+}
 
-  useEffect(() => {
-    if (!sessionId) return; // Wait until client session ID is ready
-    const stored = localStorage.getItem(`${STORAGE_KEY}-${sessionId}`);
-    if (stored) {
-      setMessageCount(parseInt(stored, 10));
-    }
-  }, [sessionId]);
+export function useMessageLimit(sessionId: string) {
+  const [messageCount, setMessageCount] = useState(() => getStoredCount(sessionId));
 
   const incrementCount = useCallback(() => {
     setMessageCount((prev) => {

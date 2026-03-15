@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { sendChatMessage } from "@/lib/n8n-chat-api";
 import { useMessageLimit } from "./use-message-limit";
 import { useLandlordId } from "./use-landlord-id";
+import { useLocation } from "./use-location";
 
 export interface ChatMessage {
   id: string;
@@ -51,7 +52,8 @@ const CATEGORIES = [
       "6. Jet Ski Safari (Guided high-speed coastal tours)\n" +
       "7. Sunset Cruises (Relaxing evening boat rides with drinks)\n" +
       "8. Fishing (Tuna and swordfish fishing trips)\n" +
-      "9. Sailing School (Introductory courses and day sailing)\n\n" +
+      "9. Sailing School (Introductory courses and day sailing)\n" +
+      "10. Wakeboarding (Cable and boat wakeboarding sessions)\n\n" +
       "Which activity interests you? Type the number! 👇\n" +
       "(Type 0 to go back to main menu)",
     activities: [
@@ -64,6 +66,7 @@ const CATEGORIES = [
       "Sunset Cruises",
       "Fishing",
       "Sailing School",
+      "Wakeboarding",
     ],
   },
   {
@@ -189,7 +192,7 @@ const CATEGORIES = [
 const ALL_ACTIVITIES_RESPONSE =
   "Here's everything we offer in Split & Dalmatia! 🌊\n\n" +
   "🌊 NAUTICAL & WATER ACTIVITIES\n" +
-  "1. Boat Tours | 2. Scuba Diving | 3. Sea Kayaking | 4. Stand Up Paddling (SUP) | 5. Parasailing | 6. Jet Ski Safari | 7. Sunset Cruises | 8. Fishing | 9. Sailing School\n\n" +
+  "1. Boat Tours | 2. Scuba Diving | 3. Sea Kayaking | 4. Stand Up Paddling (SUP) | 5. Parasailing | 6. Jet Ski Safari | 7. Sunset Cruises | 8. Fishing | 9. Sailing School | 10. Wakeboarding\n\n" +
   "🏍️ ADRENALINE & ADVENTURE\n" +
   "1. White Water Rafting | 2. Zipline | 3. Canyoning | 4. Skydiving | 5. Rock Climbing | 6. Bungee Jumping | 7. Off-road Buggy Safari | 8. Paintball Battles | 9. Speleology\n\n" +
   "🚗 TRANSPORTATION RENTALS\n" +
@@ -200,8 +203,27 @@ const ALL_ACTIVITIES_RESPONSE =
   "1. VIP Club Booking | 2. Pub Crawl | 3. Party Boat | 4. Cocktail Bar Experiences | 5. Casino Nights | 6. Live Music Events | 7. Beach Club Parties | 8. Folklore Evenings | 9. Open Air Cinema | 10. Wine & Jazz Nights\n\n" +
   "Type the category number (1-5) then the activity number to start booking! 👇";
 
+// ── SUB-CATEGORIES (activities with nested menus) ────────────────────────────
+const SUB_CATEGORIES: Record<string, { prompt: string; activities: string[] }> = {
+  "Boat Tours": {
+    prompt:
+      "What type of Boat Tour are you looking for? ⛵\n\n" +
+      "1. Speedboat Tours (fast island-hopping, Blue Cave, Hvar)\n" +
+      "2. Luxury Speedboat Tour (premium vessels, small groups)\n" +
+      "3. One Day Big Boat Tour (large group, full-day excursions)\n" +
+      "4. Multi-Day Boat Tour (overnight sailing, island routes)\n\n" +
+      "Type the number! 👇\n(Type 0 to go back)",
+    activities: [
+      "Speedboat Tours",
+      "Luxury Speedboat Tour",
+      "One Day Big Boat Tour",
+      "Multi-Day Boat Tour",
+    ],
+  },
+};
+
 // ── CHAT PHASE ───────────────────────────────────────────────────────────────
-type ChatPhase = "menu" | { category: number } | "booking";
+type ChatPhase = "menu" | { category: number } | { subCategory: string } | "booking";
 
 export function useChat() {
   // Start with empty string — populated in useEffect (client-only)
@@ -211,6 +233,7 @@ export function useChat() {
   const [isLoading, setIsLoading] = useState(false);
   const [chatPhase, setChatPhase] = useState<ChatPhase>("menu");
   const landlordId = useLandlordId();
+  const location = useLocation();
   const { messageCount, canSendMessage, isLastMessage, isLimitReached, incrementCount, resetCount } =
     useMessageLimit(sessionId);
   const abortRef = useRef<AbortController | null>(null);
@@ -247,6 +270,7 @@ export function useChat() {
       try {
         const response = await sendChatMessage(sessionId, text, {
           landlordId,
+          location,
           messageCount: messageCount + 1,
           isLastMessage,
         });
@@ -270,7 +294,7 @@ export function useChat() {
         setIsLoading(false);
       }
     },
-    [sessionId, landlordId, messageCount, isLastMessage, incrementCount]
+    [sessionId, landlordId, location, messageCount, isLastMessage, incrementCount]
   );
 
   // ── SEND MESSAGE ───────────────────────────────────────────────────────────
@@ -336,15 +360,57 @@ export function useChat() {
           setChatPhase("menu");
           return;
         }
-        // Valid activity number → resolve name → send to n8n
+        // Valid activity number → resolve name → check sub-categories or send to n8n
         const cat = CATEGORIES[chatPhase.category - 1];
         if (isNum && num >= 1 && num <= cat.activities.length) {
           const activityName = cat.activities[num - 1];
+          // Check for sub-categories
+          if (SUB_CATEGORIES[activityName]) {
+            const sub = SUB_CATEGORIES[activityName];
+            setMessages((prev) => [
+              ...prev,
+              { id: uuidv4(), role: "bot", content: sub.prompt, timestamp: new Date() },
+            ]);
+            setChatPhase({ subCategory: activityName });
+            incrementCount();
+            return;
+          }
           setChatPhase("booking");
           await callN8n(`I want to book: ${activityName}`);
           return;
         }
         // Non-number or out-of-range → send as-is to n8n (e.g. "how much does it cost?")
+        setChatPhase("booking");
+        await callN8n(trimmed);
+        return;
+      }
+
+      // ── STATE: SUB-CATEGORY (e.g. Boat Tours sub-types) ─────────────────
+      if (typeof chatPhase === "object" && "subCategory" in chatPhase) {
+        if (trimmed === "0" || trimmed.toLowerCase() === "back") {
+          const parentIdx = CATEGORIES.findIndex((c) => c.activities.includes(chatPhase.subCategory));
+          if (parentIdx >= 0) {
+            setMessages((prev) => [
+              ...prev,
+              { id: uuidv4(), role: "bot", content: CATEGORIES[parentIdx].prompt, timestamp: new Date() },
+            ]);
+            setChatPhase({ category: parentIdx + 1 });
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              { id: uuidv4(), role: "bot", content: GREETING, timestamp: new Date() },
+            ]);
+            setChatPhase("menu");
+          }
+          return;
+        }
+        const sub = SUB_CATEGORIES[chatPhase.subCategory];
+        if (sub && isNum && num >= 1 && num <= sub.activities.length) {
+          const subName = sub.activities[num - 1];
+          setChatPhase("booking");
+          await callN8n(`I want to book: ${subName}`);
+          return;
+        }
         setChatPhase("booking");
         await callN8n(trimmed);
         return;

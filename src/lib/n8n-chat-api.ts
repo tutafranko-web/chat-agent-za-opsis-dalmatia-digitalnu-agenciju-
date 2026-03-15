@@ -1,5 +1,6 @@
 export interface ChatMetadata {
   landlordId?: string | null;
+  location?: string | null;
   messageCount: number;
   isLastMessage: boolean;
 }
