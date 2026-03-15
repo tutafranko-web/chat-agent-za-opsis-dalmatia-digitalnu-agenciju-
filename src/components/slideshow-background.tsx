@@ -1,40 +1,62 @@
 "use client";
 
-const PHOTOS = [
+const LEFT_PHOTOS = [
   { src: "/activities/blue-cave.jpg", alt: "Blue Cave" },
-  { src: "/activities/island-aerial.jpg", alt: "Island hopping" },
   { src: "/activities/atv-safari.jpg", alt: "ATV safari" },
-  { src: "/activities/rafting.jpg", alt: "White water rafting" },
   { src: "/activities/wakeboarding.jpg", alt: "Wakeboarding" },
+];
+
+const RIGHT_PHOTOS = [
+  { src: "/activities/island-aerial.jpg", alt: "Island hopping" },
+  { src: "/activities/rafting.jpg", alt: "White water rafting" },
   { src: "/activities/zipline.jpg", alt: "Zipline adventure" },
 ];
 
-export function SlideshowBackground() {
-  // Duplicate photos for seamless infinite scroll.
-  // translateX(-50%) brings us back to the start of the second copy = perfect loop.
-  const doubled = [...PHOTOS, ...PHOTOS];
+function VerticalColumn({
+  photos,
+  direction,
+  side,
+}: {
+  photos: { src: string; alt: string }[];
+  direction: "up" | "down";
+  side: "left" | "right";
+}) {
+  // Duplicate for seamless loop
+  const doubled = [...photos, ...photos];
 
   return (
-    <div className="fixed inset-0 z-0 overflow-hidden">
-      {/* Scrolling photo strip */}
+    <div
+      className={`absolute top-0 bottom-0 overflow-hidden hidden md:block ${
+        side === "left" ? "left-0" : "right-0"
+      }`}
+      style={{ width: "calc((100vw - 42rem) / 2)" }}
+    >
       <div
-        className="flex h-full will-change-transform"
-        style={{ animation: "slideshow-scroll 60s linear infinite" }}
+        className="flex flex-col will-change-transform"
+        style={{
+          animation: `slide-${direction} 30s linear infinite`,
+        }}
       >
         {doubled.map((photo, i) => (
           <img
             key={i}
             src={photo.src}
             alt={photo.alt}
-            className="h-full flex-shrink-0 object-cover"
-            style={{ width: "50vw" }}
-            loading={i < PHOTOS.length ? "eager" : "lazy"}
+            className="w-full flex-shrink-0 object-cover"
+            style={{ height: "50vh" }}
+            loading={i < photos.length ? "eager" : "lazy"}
           />
         ))}
       </div>
+    </div>
+  );
+}
 
-      {/* Dark overlay for readability */}
-      <div className="absolute inset-0 bg-black/50" />
+export function SlideshowBackground() {
+  return (
+    <div className="fixed inset-0 z-0 bg-black">
+      <VerticalColumn photos={LEFT_PHOTOS} direction="up" side="left" />
+      <VerticalColumn photos={RIGHT_PHOTOS} direction="down" side="right" />
     </div>
   );
 }
