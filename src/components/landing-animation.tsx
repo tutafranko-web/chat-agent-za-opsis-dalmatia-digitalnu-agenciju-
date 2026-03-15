@@ -18,9 +18,9 @@ export function LandingAnimation({ onComplete }: LandingAnimationProps) {
     }
     sessionStorage.setItem("opsis-animation-seen", "1");
 
-    // Play for 4 seconds, then fade out over 1 second
-    const fadeTimer = setTimeout(() => setFadeOut(true), 4000);
-    const completeTimer = setTimeout(() => onComplete(), 5000);
+    // Play for 2.5 seconds, then fade out over 1 second
+    const fadeTimer = setTimeout(() => setFadeOut(true), 2500);
+    const completeTimer = setTimeout(() => onComplete(), 3500);
     return () => {
       clearTimeout(fadeTimer);
       clearTimeout(completeTimer);
