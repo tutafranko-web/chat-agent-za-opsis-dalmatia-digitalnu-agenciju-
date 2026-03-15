@@ -1,12 +1,12 @@
 "use client";
 
 const PHOTOS = [
-  { src: "/activities/blue-cave.svg", alt: "Blue Cave" },
-  { src: "/activities/island-aerial.svg", alt: "Island hopping" },
-  { src: "/activities/atv-safari.svg", alt: "ATV safari" },
-  { src: "/activities/rafting.svg", alt: "White water rafting" },
-  { src: "/activities/wakeboarding.svg", alt: "Wakeboarding" },
-  { src: "/activities/zipline.svg", alt: "Zipline adventure" },
+  { src: "/activities/blue-cave.jpg", alt: "Blue Cave" },
+  { src: "/activities/island-aerial.jpg", alt: "Island hopping" },
+  { src: "/activities/atv-safari.jpg", alt: "ATV safari" },
+  { src: "/activities/rafting.jpg", alt: "White water rafting" },
+  { src: "/activities/wakeboarding.jpg", alt: "Wakeboarding" },
+  { src: "/activities/zipline.jpg", alt: "Zipline adventure" },
 ];
 
 export function SlideshowBackground() {
