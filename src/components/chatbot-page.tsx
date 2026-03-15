@@ -3,6 +3,7 @@
 import { useState, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { LandingAnimation } from "@/components/landing-animation";
+import { SlideshowBackground } from "@/components/slideshow-background";
 
 const Chatbot = dynamic(
   () => import("@/components/chatbot").then((m) => ({ default: m.Chatbot })),
@@ -22,7 +23,9 @@ export function ChatbotPage() {
         <LandingAnimation onComplete={handleAnimationComplete} />
       )}
       {phase === "chat" && (
-        <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-in fade-in duration-700">
+        <>
+        <SlideshowBackground />
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 animate-in fade-in duration-700">
           <Suspense fallback={
             <div className="w-full max-w-2xl mx-auto h-[calc(100vh-2rem)] md:h-[600px] rounded-xl border border-border bg-background/80 backdrop-blur-sm overflow-hidden flex flex-col">
               <div className="px-4 py-3 border-b border-border bg-card">
@@ -58,6 +61,7 @@ export function ChatbotPage() {
             </div>
           </div>
         </div>
+        </>
       )}
     </main>
   );
