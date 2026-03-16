@@ -93,6 +93,15 @@ export async function POST(req: NextRequest) {
     clearTimeout(timeoutId);
 
     const data = await res.json();
+
+    // Strip internal tags before returning to client
+    if (data.output && typeof data.output === "string") {
+      data.output = data.output
+        .replace(/\[BOOKING_DATA\][\s\S]*/g, "")
+        .replace(/[¨"]*===\s*\[MESSAGE LIMIT\]\s*===[\s\S]*?===\s*\[END MESSAGE LIMIT\]\s*===[¨"]*/g, "")
+        .trim();
+    }
+
     return NextResponse.json(data, { status: res.status });
   } catch {
     clearTimeout(timeoutId);
