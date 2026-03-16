@@ -94,11 +94,21 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
 
-    // Strip internal tags before returning to client
+    // Strip ALL internal system tags before returning to client
     if (data.output && typeof data.output === "string") {
       data.output = data.output
         .replace(/\[BOOKING_DATA\][\s\S]*/g, "")
         .replace(/[¨"]*===\s*\[MESSAGE LIMIT\]\s*===[\s\S]*?===\s*\[END MESSAGE LIMIT\]\s*===[¨"]*/g, "")
+        .replace(/===\s*\[OPERATOR DATA[\s\S]*?===\s*\[END OPERATOR DATA\]\s*===/g, "")
+        .replace(/===\s*\[OPERATOR DATA:[\s\S]*?===/g, "")
+        .replace(/===\s*\[BLACKOUT DATES[\s\S]*?===\s*\[END BLACKOUT DATES\]\s*===/g, "")
+        .replace(/\[BLACKOUT DATES\][\s\S]*?\[END BLACKOUT DATES\]/g, "")
+        .replace(/===\s*\[NO OPERATOR DATA[\s\S]*?===\s*\[END\]\s*===/g, "")
+        .replace(/===\s*\[CURRENT DATE\][\s\S]*?===\s*\[END CURRENT DATE\]\s*===/g, "")
+        .replace(/===\s*\[LANDLORD CONTEXT\][\s\S]*?===\s*\[END LANDLORD CONTEXT\]\s*===/g, "")
+        .replace(/===\s*\[LOCATION CONTEXT\][\s\S]*?===\s*\[END LOCATION CONTEXT\]\s*===/g, "")
+        .replace(/IMPORTANT: Present these operators[\s\S]*?found!/g, "")
+        .replace(/WARNING: Some operators are marked UNAVAILABLE[\s\S]*?dates\./g, "")
         .trim();
     }
 
