@@ -21,8 +21,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
         className={cn(
           "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
           isBot
-            ? "bg-card text-card-foreground border border-border rounded-bl-sm"
-            : "bg-primary text-primary-foreground rounded-br-sm"
+            ? "bg-card/90 text-card-foreground border border-border rounded-bl-sm backdrop-blur-sm"
+            : "bg-primary/90 text-primary-foreground rounded-br-sm backdrop-blur-sm"
         )}
       >
         {message.content}

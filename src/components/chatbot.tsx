@@ -6,6 +6,7 @@ import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { useChat } from "@/hooks/use-chat";
 import { MESSAGE_LIMIT } from "@/lib/constants";
+import { BackgroundPaths } from "@/components/ui/background-paths";
 
 export function Chatbot() {
   const { messages, isLoading, sendMessage, canSendMessage, isLimitReached, messageCount, resetSession } =
@@ -19,8 +20,12 @@ export function Chatbot() {
   }, [messages, isLoading]);
 
   return (
-    <Card className="flex flex-col w-full max-w-2xl mx-auto h-[calc(100vh-2rem)] md:h-[600px] border-border bg-background/80 backdrop-blur-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-border bg-card">
+    <Card className="relative flex flex-col w-full max-w-2xl mx-auto h-[calc(100vh-2rem)] md:h-[600px] border-border bg-background/80 backdrop-blur-sm overflow-hidden">
+      {/* Animated background paths */}
+      <BackgroundPaths />
+
+      {/* Header */}
+      <div className="relative z-10 px-4 py-3 border-b border-border bg-card/90 backdrop-blur-sm">
         <h2 className="text-sm font-semibold text-foreground">
           Opsis Dalmatia — AI Concierge
         </h2>
@@ -39,14 +44,15 @@ export function Chatbot() {
         </p>
       </div>
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4" role="log" aria-live="polite" aria-label="Chat messages">
+      {/* Messages */}
+      <div ref={scrollRef} className="relative z-10 flex-1 min-h-0 overflow-y-auto p-4" role="log" aria-live="polite" aria-label="Chat messages">
         <div className="space-y-1">
           {messages.map((msg) => (
             <ChatMessage key={msg.id} message={msg} />
           ))}
           {isLoading && (
             <div className="flex justify-start mb-3">
-              <div className="bg-card text-card-foreground border border-border rounded-2xl rounded-bl-sm px-4 py-3 text-sm">
+              <div className="bg-card/90 text-card-foreground border border-border rounded-2xl rounded-bl-sm px-4 py-3 text-sm backdrop-blur-sm">
                 <span className="inline-flex gap-1">
                   <span className="animate-bounce delay-0">.</span>
                   <span className="animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
@@ -58,15 +64,18 @@ export function Chatbot() {
         </div>
       </div>
 
-      <ChatInput
-        onSend={sendMessage}
-        disabled={!canSendMessage || isLoading}
-        placeholder={
-          isLimitReached
-            ? "Session complete. Thank you for chatting!"
-            : "Ask about activities in Split & Dalmatia..."
-        }
-      />
+      {/* Input */}
+      <div className="relative z-10">
+        <ChatInput
+          onSend={sendMessage}
+          disabled={!canSendMessage || isLoading}
+          placeholder={
+            isLimitReached
+              ? "Session complete. Thank you for chatting!"
+              : "Ask about activities in Split & Dalmatia..."
+          }
+        />
+      </div>
     </Card>
   );
 }
