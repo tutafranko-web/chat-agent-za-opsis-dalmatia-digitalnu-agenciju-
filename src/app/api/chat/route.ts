@@ -40,10 +40,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ output: "Chatbot configuration error. Please contact support." }, { status: 200 });
   }
 
-  const body = await req.json();
+  // --- Parse body safely ---
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ output: "Invalid request." }, { status: 400 });
+  }
+
+  // --- Validate required fields ---
+  if (!body.sessionId || !body.action) {
+    return NextResponse.json({ output: "Invalid request." }, { status: 400 });
+  }
 
   // --- Rate limit checks ---
-  const sessionId = body.sessionId || "unknown";
+  const sessionId = (body.sessionId as string) || "unknown";
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
 
   if (isRateLimited(sessionId, sessionBucket, SESSION_RATE_LIMIT, SESSION_RATE_WINDOW)) {
