@@ -1,19 +1,30 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 
-function FloatingPaths({ position }: { position: number }) {
-  const paths = Array.from({ length: 36 }, (_, i) => ({
-    id: i,
-    d: `M-${380 - i * 5 * position} -${189 + i * 6}C-${
-      380 - i * 5 * position
-    } -${189 + i * 6} -${312 - i * 5 * position} ${216 - i * 6} ${
-      152 - i * 5 * position
-    } ${343 - i * 6}C${616 - i * 5 * position} ${470 - i * 6} ${
-      684 - i * 5 * position
-    } ${875 - i * 6} ${684 - i * 5 * position} ${875 - i * 6}`,
-    width: 0.5 + i * 0.03,
-  }));
+function FloatingPaths({
+  position,
+  count,
+}: {
+  position: number;
+  count: number;
+}) {
+  const step = Math.max(1, Math.floor(36 / count));
+  const paths = Array.from({ length: count }, (_, idx) => {
+    const i = idx * step;
+    return {
+      id: i,
+      d: `M-${380 - i * 5 * position} -${189 + i * 6}C-${
+        380 - i * 5 * position
+      } -${189 + i * 6} -${312 - i * 5 * position} ${216 - i * 6} ${
+        152 - i * 5 * position
+      } ${343 - i * 6}C${616 - i * 5 * position} ${470 - i * 6} ${
+        684 - i * 5 * position
+      } ${875 - i * 6} ${684 - i * 5 * position} ${875 - i * 6}`,
+      width: 0.5 + i * 0.03,
+    };
+  });
 
   return (
     <div className="absolute inset-0 pointer-events-none">
@@ -49,10 +60,22 @@ function FloatingPaths({ position }: { position: number }) {
 }
 
 export function BackgroundPaths() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
+  const pathCount = isMobile ? 6 : 36;
+
   return (
     <div className="absolute inset-0 overflow-hidden">
-      <FloatingPaths position={1} />
-      <FloatingPaths position={-1} />
+      <FloatingPaths position={1} count={pathCount} />
+      <FloatingPaths position={-1} count={pathCount} />
     </div>
   );
 }

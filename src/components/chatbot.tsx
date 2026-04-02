@@ -1,12 +1,20 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/card";
 import { ChatMessage } from "./chat-message";
 import { ChatInput } from "./chat-input";
 import { useChat } from "@/hooks/use-chat";
 import { MESSAGE_LIMIT } from "@/lib/constants";
-import { BackgroundPaths } from "@/components/ui/background-paths";
+
+const BackgroundPaths = dynamic(
+  () =>
+    import("@/components/ui/background-paths").then((m) => ({
+      default: m.BackgroundPaths,
+    })),
+  { ssr: false }
+);
 
 export function Chatbot() {
   const { messages, isLoading, sendMessage, canSendMessage, isLimitReached, messageCount, resetSession } =

@@ -123,8 +123,9 @@ export function ShaderAnimation() {
     const mesh = new THREE.Mesh(geometry, material)
     scene.add(mesh)
 
-    const renderer = new THREE.WebGLRenderer()
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false })
+    const isMobile = window.innerWidth < 768
+    renderer.setPixelRatio(isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5))
     container.appendChild(renderer.domElement)
 
     sceneRef.current = {
@@ -137,7 +138,12 @@ export function ShaderAnimation() {
 
     const onWindowResize = () => {
       const rect = container.getBoundingClientRect()
-      renderer.setSize(rect.width, rect.height)
+      const maxDim = isMobile ? 480 : 2048
+      const w = Math.min(rect.width, maxDim)
+      const h = Math.min(rect.height, maxDim)
+      renderer.setSize(w, h)
+      renderer.domElement.style.width = "100%"
+      renderer.domElement.style.height = "100%"
       uniforms.resolution.value.x = renderer.domElement.width
       uniforms.resolution.value.y = renderer.domElement.height
     }

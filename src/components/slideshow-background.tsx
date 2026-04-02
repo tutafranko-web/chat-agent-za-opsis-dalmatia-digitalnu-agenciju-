@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 
 const LEFT_PHOTOS = [
@@ -27,7 +28,7 @@ function VerticalColumn({
 
   return (
     <div
-      className={`absolute top-0 bottom-0 overflow-hidden hidden md:block ${
+      className={`absolute top-0 bottom-0 overflow-hidden ${
         side === "left" ? "left-0" : "right-0"
       }`}
       style={{ width: "calc((100vw - 42rem) / 2)" }}
@@ -44,9 +45,10 @@ function VerticalColumn({
               src={photo.src}
               alt={photo.alt}
               fill
-              sizes="(min-width: 768px) 25vw, 0px"
+              sizes="25vw"
               className="object-cover"
-              quality={75}
+              quality={70}
+              loading={i < photos.length ? undefined : "lazy"}
               priority={i < photos.length}
             />
           </div>
@@ -57,10 +59,24 @@ function VerticalColumn({
 }
 
 export function SlideshowBackground() {
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    setIsDesktop(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+
   return (
     <div className="fixed inset-0 z-0 bg-black">
-      <VerticalColumn photos={LEFT_PHOTOS} direction="up" side="left" />
-      <VerticalColumn photos={RIGHT_PHOTOS} direction="down" side="right" />
+      {isDesktop && (
+        <>
+          <VerticalColumn photos={LEFT_PHOTOS} direction="up" side="left" />
+          <VerticalColumn photos={RIGHT_PHOTOS} direction="down" side="right" />
+        </>
+      )}
     </div>
   );
 }
