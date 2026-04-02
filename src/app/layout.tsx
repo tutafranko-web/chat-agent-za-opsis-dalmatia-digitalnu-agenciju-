@@ -16,22 +16,22 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://opsisdalmatia.com"),
-  title: "Opsis Dalmatia - Tourist Assistant",
+  title: {
+    default: "Opsis Dalmatia",
+    template: "%s | Opsis Dalmatia",
+  },
   description:
-    "Your personal AI assistant for booking activities and tours in Split and Dalmatia, Croatia. Discover boat tours, adventure sports, guided experiences and more.",
+    "Digitalna turistička agencija u Splitu — AI chatbotovi, glasovni agenti, web razvoj za turizam.",
   robots: { index: true, follow: true },
   openGraph: {
-    title: "Opsis Dalmatia - Tourist Assistant",
-    description: "Discover and book the best activities in Split and Dalmatia.",
-    url: "https://opsisdalmatia.com",
     siteName: "Opsis Dalmatia",
     type: "website",
-    locale: "en_US",
   },
-  twitter: {
-    card: "summary",
-    title: "Opsis Dalmatia - Tourist Assistant",
-    description: "Discover and book the best activities in Split and Dalmatia.",
+  alternates: {
+    languages: {
+      hr: "https://opsisdalmatia.com/hr",
+      en: "https://opsisdalmatia.com/en",
+    },
   },
 };
 
@@ -41,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html className="dark">
       <body
         className={`${geistSans.variable} antialiased`}
       >
