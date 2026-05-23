@@ -1,30 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleChatTurn } from "@/lib/chat-engine";
 
-const N8N_URL = process.env.N8N_CHAT_WEBHOOK_URL || "";
-const N8N_AUTH = process.env.N8N_WEBHOOK_AUTH || "";
-const N8N_OPSIS_KEY = process.env.N8N_OPSIS_KEY || "";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
-// --- Rate Limiter (in-memory, per session + per IP) ---
+// ── Rate Limiter (in-memory, per session + per IP) ─────────────────────────
 const sessionBucket = new Map<string, { count: number; resetAt: number }>();
 const ipBucket = new Map<string, { count: number; resetAt: number }>();
 
-const SESSION_RATE_LIMIT = 3; // max 3 messages per window per session
-const SESSION_RATE_WINDOW = 10_000; // 10 seconds
-const IP_RATE_LIMIT = 60; // max 60 messages per window per IP
-const IP_RATE_WINDOW = 3_600_000; // 1 hour
+const SESSION_RATE_LIMIT = 3;
+const SESSION_RATE_WINDOW = 10_000;
+const IP_RATE_LIMIT = 60;
+const IP_RATE_WINDOW = 3_600_000;
+const SERVER_MESSAGE_CAP = 15;
 
-// Cleanup stale entries every 5 minutes to prevent memory leak
 setInterval(() => {
   const now = Date.now();
-  for (const [key, val] of sessionBucket) {
-    if (now > val.resetAt) sessionBucket.delete(key);
-  }
-  for (const [key, val] of ipBucket) {
-    if (now > val.resetAt) ipBucket.delete(key);
-  }
+  for (const [k, v] of sessionBucket) if (now > v.resetAt) sessionBucket.delete(k);
+  for (const [k, v] of ipBucket) if (now > v.resetAt) ipBucket.delete(k);
 }, 300_000);
 
-function isRateLimited(key: string, bucket: Map<string, { count: number; resetAt: number }>, limit: number, window: number): boolean {
+function bumpRate(key: string, bucket: Map<string, { count: number; resetAt: number }>, limit: number, window: number): boolean {
   const now = Date.now();
   const entry = bucket.get(key);
   if (!entry || now > entry.resetAt) {
@@ -36,11 +32,6 @@ function isRateLimited(key: string, bucket: Map<string, { count: number; resetAt
 }
 
 export async function POST(req: NextRequest) {
-  if (!N8N_URL) {
-    return NextResponse.json({ output: "Chatbot configuration error. Please contact support." }, { status: 200 });
-  }
-
-  // --- Parse body safely ---
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -48,76 +39,46 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ output: "Invalid request." }, { status: 400 });
   }
 
-  // --- Validate required fields ---
   if (!body.sessionId || !body.action) {
     return NextResponse.json({ output: "Invalid request." }, { status: 400 });
   }
 
-  // --- Rate limit checks ---
-  const sessionId = (body.sessionId as string) || "unknown";
+  const sessionId = String(body.sessionId);
+  const action = String(body.action);
+
+  if (action === "loadPreviousSession") {
+    // Sessions are in-memory and ephemeral — we don't persist transcript reads.
+    return NextResponse.json({ output: "" });
+  }
+
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
 
-  if (isRateLimited(sessionId, sessionBucket, SESSION_RATE_LIMIT, SESSION_RATE_WINDOW)) {
-    return NextResponse.json(
-      { output: "You're sending messages too quickly. Please wait a few seconds and try again." },
-      { status: 200 }
-    );
+  if (bumpRate(sessionId, sessionBucket, SESSION_RATE_LIMIT, SESSION_RATE_WINDOW)) {
+    return NextResponse.json({ output: "You're sending messages too quickly. Please wait a few seconds and try again." });
   }
-  if (isRateLimited(ip, ipBucket, IP_RATE_LIMIT, IP_RATE_WINDOW)) {
-    return NextResponse.json(
-      { output: "Too many requests. Please try again later." },
-      { status: 200 }
-    );
+  if (bumpRate(ip, ipBucket, IP_RATE_LIMIT, IP_RATE_WINDOW)) {
+    return NextResponse.json({ output: "Too many requests. Please try again later." });
   }
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (N8N_AUTH) {
-    headers["Authorization"] = `Basic ${N8N_AUTH}`;
-  }
-  if (N8N_OPSIS_KEY) {
-    headers["x-opsis-key"] = N8N_OPSIS_KEY;
+  const metadata = (body.metadata as Record<string, unknown> | undefined) || {};
+  const messageCount = Number(metadata.messageCount || 0);
+  if (messageCount > SERVER_MESSAGE_CAP) {
+    return NextResponse.json({ output: "You have reached the maximum number of messages for this session. Please start a new conversation if you need further assistance." });
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  const chatInput = String(body.chatInput || "");
+  const landlordId = metadata.landlordId ? String(metadata.landlordId) : undefined;
+  const location = metadata.location ? String(metadata.location) : undefined;
+
+  if (!chatInput.trim()) {
+    return NextResponse.json({ output: "Please type a message." });
+  }
 
   try {
-    const res = await fetch(N8N_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    const data = await res.json();
-
-    // Strip ALL internal system tags before returning to client
-    if (data.output && typeof data.output === "string") {
-      data.output = data.output
-        .replace(/\[BOOKING_DATA\][\s\S]*/g, "")
-        .replace(/[¨"]*===\s*\[MESSAGE LIMIT\]\s*===[\s\S]*?===\s*\[END MESSAGE LIMIT\]\s*===[¨"]*/g, "")
-        .replace(/===\s*\[OPERATOR DATA[\s\S]*?===\s*\[END OPERATOR DATA\]\s*===/g, "")
-        .replace(/===\s*\[OPERATOR DATA:[\s\S]*?===/g, "")
-        .replace(/===\s*\[BLACKOUT DATES[\s\S]*?===\s*\[END BLACKOUT DATES\]\s*===/g, "")
-        .replace(/\[BLACKOUT DATES\][\s\S]*?\[END BLACKOUT DATES\]/g, "")
-        .replace(/===\s*\[NO OPERATOR DATA[\s\S]*?===\s*\[END\]\s*===/g, "")
-        .replace(/===\s*\[CURRENT DATE\][\s\S]*?===\s*\[END CURRENT DATE\]\s*===/g, "")
-        .replace(/===\s*\[LANDLORD CONTEXT\][\s\S]*?===\s*\[END LANDLORD CONTEXT\]\s*===/g, "")
-        .replace(/===\s*\[LOCATION CONTEXT\][\s\S]*?===\s*\[END LOCATION CONTEXT\]\s*===/g, "")
-        .replace(/IMPORTANT: Present these operators[\s\S]*?found!/g, "")
-        .replace(/WARNING: Some operators are marked UNAVAILABLE[\s\S]*?dates\./g, "")
-        .trim();
-    }
-
-    return NextResponse.json(data, { status: res.status });
-  } catch {
-    clearTimeout(timeoutId);
-    return NextResponse.json(
-      { output: "I'm sorry, the request timed out. Please try again in a moment." },
-      { status: 200 }
-    );
+    const result = await handleChatTurn({ sessionId, chatInput, landlordId, location });
+    return NextResponse.json({ output: result.output, booked: result.booked });
+  } catch (err) {
+    console.error("[chat] turn failed", err);
+    return NextResponse.json({ output: "Sorry, I'm having trouble connecting right now. Please try again in a moment." });
   }
 }
