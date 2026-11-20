@@ -11,9 +11,10 @@ import { env } from "./env";
 import { newBookingRef, newNonce, uniqueId } from "./ids";
 import { routeRecipients, sendMail } from "./mail";
 import * as T from "./mail-templates";
-import { appendBooking, findBooking, listBookings, loadCatalogData, logEvent, updateBooking } from "./repo";
+import { manageUrl } from "./partners";
+import { appendBooking, findBooking, listBookings, loadCatalogData, logEvent, updateBooking, upsertDays } from "./repo";
 import { cleanPhone, cleanText, isEmail, isPhone, normalizeEmail } from "./sanitize";
-import type { Booking } from "./schema";
+import { dayKey, type Booking } from "./schema";
 import { signToken, verifyToken } from "./tokens";
 import { addDays, daysBetween, zagrebNow } from "./zagreb-time";
 
@@ -52,9 +53,10 @@ async function evaluate(
   if (!dc.ok) return { ok: false, error: { code: dc.code, earliest: dc.earliest, latest: dc.latest } };
   const pc = checkParty(adults, children, offer.child_policy === "adults_only");
   if (!pc.ok) return { ok: false, error: { code: pc.code } };
-  const [{ blackouts }, bookings] = await Promise.all([loadCatalogData(fresh), listBookings(fresh)]);
+  const [{ blackouts, days }, bookings] = await Promise.all([loadCatalogData(fresh), listBookings(fresh)]);
   const opts = {
     blackouts,
+    days,
     bookings,
     operatorId: offer.operator_id,
     activityId: offer.id,
@@ -205,6 +207,7 @@ function respondUrl(b: Booking, at: Date): string {
 async function notifyNewBooking(b: Booking, offer: OfferInternal, at: Date) {
   const lang = (b.language === "hr" ? "hr" : "en") as Lang;
   const url = respondUrl(b, at);
+  const calendarUrl = manageUrl(offer.operator);
   const results = await Promise.allSettled([
     sendMail({ to: b.tourist_email, audience: "requester", tag: "booking_received", idempotencyKey: `received-${b.ref}`, ...T.touristRequestReceived(b, lang) }),
     (async () => {
@@ -213,9 +216,9 @@ async function notifyNewBooking(b: Booking, offer: OfferInternal, at: Date) {
       const note = partnerToAdmin
         ? `Pilot/demo: operater ${offer.operator_name} (${offer.operator.email}) ne prima mail. Potvrdi ili odbij ti, gumbom ispod.`
         : `Operater ${offer.operator_name} je dobio zahtjev na ${offer.operator.email}.`;
-      const admin = sendMail({ to: env.adminEmails(), audience: "admin", tag: "booking_admin", idempotencyKey: `admin-${b.ref}`, ...T.adminNewRequest(b, url, note) });
+      const admin = sendMail({ to: env.adminEmails(), audience: "admin", tag: "booking_admin", idempotencyKey: `admin-${b.ref}`, ...T.adminNewRequest(b, url, note, calendarUrl) });
       if (partnerToAdmin) return admin;
-      const op = sendMail({ to: offer.operator.email, audience: "partner", tag: "booking_operator", idempotencyKey: `operator-${b.ref}`, ...T.operatorNewRequest(b, url) });
+      const op = sendMail({ to: offer.operator.email, audience: "partner", tag: "booking_operator", idempotencyKey: `operator-${b.ref}`, ...T.operatorNewRequest(b, url, calendarUrl) });
       return Promise.all([admin, op]);
     })(),
   ]);
@@ -246,16 +249,38 @@ export async function getRespondView(token: string): Promise<RespondView | null>
   return { booking: b, meeting_point: offer?.meeting_point ?? "", expired: false };
 }
 
+/**
+ * Operator answers a request. `day` lets the same tap also tell us about the
+ * rest of that day ("full" / "closed"), so other guests stop asking for it.
+ */
 export async function respond(
-  input: { token: unknown; action: unknown; note: unknown },
+  input: { token: unknown; action: unknown; note: unknown; day?: unknown },
   at: Date = now(),
-): Promise<{ ok: true; status: Booking["status"]; already?: boolean } | { ok: false; code: "invalid_token" | "not_found" | "invalid_action" }> {
+): Promise<{ ok: true; status: Booking["status"]; already?: boolean; dayMarked?: "full" | "closed" } | { ok: false; code: "invalid_token" | "not_found" | "invalid_action" }> {
   const v = verifyToken<{ ref: string; op: string }>("respond", input.token, at.getTime());
   if (!v) return { ok: false, code: "invalid_token" };
   if (input.action !== "confirm" && input.action !== "decline") return { ok: false, code: "invalid_action" };
+  if (input.day !== undefined && input.day !== null && input.day !== "" && input.day !== "full" && input.day !== "closed") {
+    return { ok: false, code: "invalid_action" };
+  }
+  const day = input.day === "full" || input.day === "closed" ? input.day : null;
   const b = await findBooking(v.data.ref);
   if (!b || b.operator_id !== v.data.op) return { ok: false, code: "not_found" };
   if (b.status !== "pending") return { ok: true, status: b.status, already: true };
+  if (day && daysBetween(zagrebNow(at).date, b.date) >= 0) {
+    await upsertDays([{
+      key: dayKey(b.operator_id, b.activity_id, b.date),
+      operator_id: b.operator_id,
+      activity_id: b.activity_id,
+      date: b.date,
+      status: day,
+      seats: null,
+      note: "",
+      source: "mail",
+      updated_at: at.toISOString(),
+    }]);
+    await logEvent("info", "day_marked_from_mail", b.ref, `${b.activity_id} ${b.date} ${day}`);
+  }
 
   const status = input.action === "confirm" ? "confirmed" : "declined";
   const note = cleanText(input.note, 400, true);
@@ -276,5 +301,5 @@ export async function respond(
     }),
     sendMail({ to: env.adminEmails(), audience: "admin", tag: "booking_responded", idempotencyKey: `admin-${status}-${b.ref}`, ...T.adminBookingResponded(updated) }),
   ]);
-  return { ok: true, status };
+  return { ok: true, status, ...(day ? { dayMarked: day } : {}) };
 }

@@ -159,12 +159,12 @@ export async function runTool(name: string, rawInput: unknown, ctx: ToolContext)
           if (!dc.ok) {
             availabilityById = { all: { available: false, reason: dc.code, earliest: dc.earliest, latest: dc.latest } };
           } else {
-            const [{ blackouts }, bookings] = await Promise.all([loadCatalogData(), listBookings()]);
+            const [{ blackouts, days }, bookings] = await Promise.all([loadCatalogData(), listBookings()]);
             const people = (p.data.adults ?? 1) + Math.max(0, p.data.children ?? 0);
             availabilityById = Object.fromEntries(
               results.map((o) => {
                 const av = availabilityRule(
-                  { blackouts, bookings, operatorId: o.operator_id, activityId: o.id, maxPerDay: o.max_per_day, capacityScope: o.activity.max_per_day ? "activity" : "operator" },
+                  { blackouts, days, bookings, operatorId: o.operator_id, activityId: o.id, maxPerDay: o.max_per_day, capacityScope: o.activity.max_per_day ? "activity" : "operator" },
                   withDate,
                   people,
                 );

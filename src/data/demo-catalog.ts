@@ -217,6 +217,9 @@ export function buildDemoData(): { operators: Operator[]; activities: Activity[]
       approved_at: CREATED,
       manage_version: 1,
       source: "demo-seed",
+      ical_url: "",
+      ical_synced_at: "",
+      ical_status: "",
     });
     for (const o of op.offers) {
       a += 1;

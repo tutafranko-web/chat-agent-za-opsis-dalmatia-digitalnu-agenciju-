@@ -12,6 +12,7 @@ export const TABS = {
     headers: [
       "operator_id", "status", "company", "contact_person", "email", "phone", "city", "website", "address",
       "business_model", "max_per_day", "notes", "created_at", "approved_at", "manage_version", "source",
+      "ical_url", "ical_synced_at", "ical_status",
     ],
   },
   activities: {
@@ -41,6 +42,10 @@ export const TABS = {
   quiz: {
     name: "Kviz",
     headers: ["quiz_id", "created_at", "language", "landlord_id", "answers_json", "top_types", "recommended_ids", "email", "consent_marketing"],
+  },
+  days: {
+    name: "Dostupnost",
+    headers: ["key", "operator_id", "activity_id", "date", "status", "seats", "note", "source", "updated_at"],
   },
   blackouts: {
     name: "Neradni_dani",
@@ -94,6 +99,9 @@ export interface Operator {
   approved_at: string;
   manage_version: number;
   source: string;
+  ical_url: string;
+  ical_synced_at: string;
+  ical_status: string;
 }
 export function toOperator(r: Row): Operator {
   return {
@@ -113,6 +121,9 @@ export function toOperator(r: Row): Operator {
     approved_at: s(r, "approved_at"),
     manage_version: n(r, "manage_version") ?? 1,
     source: s(r, "source"),
+    ical_url: s(r, "ical_url"),
+    ical_synced_at: s(r, "ical_synced_at"),
+    ical_status: s(r, "ical_status"),
   };
 }
 
@@ -285,6 +296,47 @@ export function toBlackout(r: Row): Blackout {
     reason: s(r, "reason"),
     notes: s(r, "notes"),
     created_at: s(r, "created_at"),
+  };
+}
+
+// ── Day availability (one row per operator/activity/date) ───────────────────
+/**
+ * Per-day overrides set by the operator (calendar, booking e-mail, message,
+ * synced calendar). "open" with seats = that many places left from
+ * `updated_at` on; "open" without seats = explicitly working (overrides a
+ * day-off range); "full"/"closed" = no requests; "" = cleared.
+ */
+export type DayState = "open" | "full" | "closed" | "";
+export type DaySource = "kalendar" | "mail" | "poruka" | "admin" | "ical";
+export interface DayStatus {
+  key: string;
+  operator_id: string;
+  activity_id: string; // "" = all of the operator's activities
+  date: string;
+  status: DayState;
+  seats: number | null;
+  note: string;
+  source: string;
+  updated_at: string;
+}
+export function dayKey(operatorId: string, activityId: string, date: string): string {
+  return `${operatorId}|${activityId || "*"}|${date}`;
+}
+export function toDay(r: Row): DayStatus {
+  const st = s(r, "status").toLowerCase();
+  const operator_id = s(r, "operator_id");
+  const activity_id = s(r, "activity_id");
+  const date = normalizeDate(s(r, "date"));
+  return {
+    key: s(r, "key") || dayKey(operator_id, activity_id, date),
+    operator_id,
+    activity_id,
+    date,
+    status: (["open", "full", "closed"].includes(st) ? st : "") as DayState,
+    seats: n(r, "seats"),
+    note: s(r, "note"),
+    source: s(r, "source"),
+    updated_at: s(r, "updated_at"),
   };
 }
 

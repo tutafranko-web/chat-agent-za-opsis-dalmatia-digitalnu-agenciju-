@@ -2,9 +2,10 @@ import "server-only";
 import { Resend } from "resend";
 import { anthropic, model } from "./claude";
 import { getOffers } from "./catalog";
+import { verifySmtp } from "./mail";
 import { env } from "./env";
 import { TABS } from "./schema";
-import { inspectSpreadsheet, serviceAccountEmail } from "./sheets";
+import { googleIdentity, inspectSpreadsheet } from "./sheets";
 import { store } from "./store";
 
 export interface Check {
@@ -25,7 +26,7 @@ export async function healthChecks(): Promise<Check[]> {
   add("Pilot mode", true, env.pilot() ? "on (Pilot badge, demo offers listed)" : "off");
 
   // Storage
-  add("Storage", store().kind === "sheets" || !env.isProd(), store().kind === "sheets" ? `Google Sheets (${serviceAccountEmail() ?? "?"})` : "in-memory demo data (not persisted!)");
+  add("Storage", store().kind === "sheets" || !env.isProd(), store().kind === "sheets" ? `Google Sheets (${googleIdentity() ?? "?"})` : "in-memory demo data (not persisted!)");
   if (store().kind === "sheets") {
     try {
       const info = await inspectSpreadsheet();
@@ -60,8 +61,13 @@ export async function healthChecks(): Promise<Check[]> {
 
   // Mail
   const mode = env.mailMode();
-  if (!env.resendKey()) add("E-mail", mode === "log", `RESEND_API_KEY missing (mode ${mode})`);
-  else {
+  const transport = env.mailTransport();
+  if (transport === "smtp") {
+    const v = await verifySmtp();
+    add("E-mail", v.ok && (mode !== "sandbox" || !!env.sandboxTo()), `mode ${mode} · SMTP ${v.detail}`);
+  } else if (transport === "none") {
+    add("E-mail", mode === "log", `no sender set (SMTP_USER + SMTP_PASS, or RESEND_API_KEY) · mode ${mode}`);
+  } else {
     try {
       const resend = new Resend(env.resendKey());
       const { data, error } = await resend.domains.list();

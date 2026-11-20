@@ -4,25 +4,35 @@
  *   2. imports the PILOT demo catalogue (operators, activities, demo landlord)
  *      if the Operateri tab is still empty,
  *   3. optionally imports outreach leads from the old n8n lead sheet
- *      (OLD_LEADS_SHEET_ID, shared with the service account as Viewer).
+ *      (OLD_LEADS_SHEET_ID; with a service account, share it as Viewer).
  *
  * Run (env from Vercel or a local file):
  *   npx tsx --conditions=react-server --env-file=.env.vercel scripts/setup-sheet.ts
  */
-import { JWT } from "google-auth-library";
+import { JWT, OAuth2Client } from "google-auth-library";
 import { sheets } from "@googleapis/sheets";
-import { appendMany, ensureTabs, readTabs } from "@/lib/sheets";
+import { appendMany, ensureTabs, googleIdentity, readTabs } from "@/lib/sheets";
 import { buildDemoData } from "@/data/demo-catalog";
 import { isEmail, normalizeEmail } from "@/lib/sanitize";
+
+/** Same sign-in as the app: service account if set, else the sheet owner's OAuth token. */
+function readonlyAuth(): JWT | OAuth2Client {
+  const sa = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (sa) {
+    const creds = JSON.parse(sa);
+    return new JWT({ email: creds.client_email, key: String(creds.private_key).replace(/\\n/g, "\n"), scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"] });
+  }
+  const client = new OAuth2Client({ clientId: process.env.GOOGLE_OAUTH_CLIENT_ID, clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET });
+  client.setCredentials({ refresh_token: process.env.GOOGLE_OAUTH_REFRESH_TOKEN });
+  return client;
+}
 
 async function importLeads() {
   const oldId = process.env.OLD_LEADS_SHEET_ID;
   if (!oldId) return console.log("• OLD_LEADS_SHEET_ID not set — skipping lead import");
   const existing = (await readTabs(["leads"], true)).leads ?? [];
   if (existing.length) return console.log(`• Leadovi already has ${existing.length} rows — skipping lead import`);
-  const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || "{}");
-  const auth = new JWT({ email: creds.client_email, key: String(creds.private_key).replace(/\\n/g, "\n"), scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"] });
-  const api = sheets({ version: "v4", auth });
+  const api = sheets({ version: "v4", auth: readonlyAuth() });
   const res = await api.spreadsheets.values.get({ spreadsheetId: oldId, range: "A1:N2000" });
   const rows = res.data.values ?? [];
   const header = (rows[0] ?? []).map((h) => String(h).trim());
@@ -51,6 +61,7 @@ async function importLeads() {
 }
 
 async function main() {
+  console.log(`• Google: ${googleIdentity() ?? "no credentials"}`);
   const created = await ensureTabs();
   console.log(created.length ? `• Created tabs: ${created.join(", ")}` : "• All tabs exist");
   const current = await readTabs(["operators", "activities", "landlords"], true);

@@ -1,8 +1,8 @@
 import "server-only";
 import { store } from "./store";
 import {
-  toActivity, toBlackout, toBooking, toLandlord, toOperator,
-  type Activity, type Blackout, type Booking, type Landlord, type Operator, type Row,
+  toActivity, toBlackout, toBooking, toDay, toLandlord, toOperator,
+  type Activity, type Blackout, type Booking, type DayStatus, type Landlord, type Operator, type Row,
 } from "./schema";
 import { cleanText } from "./sanitize";
 
@@ -12,15 +12,41 @@ export interface CatalogData {
   operators: Operator[];
   activities: Activity[];
   blackouts: Blackout[];
+  /** Latest setting per operator/activity/date; cleared rows removed. */
+  days: DayStatus[];
+}
+
+/** Keeps the newest row per key (duplicates can appear if two saves race), then drops cleared ones. */
+export function latestDays(rows: DayStatus[]): DayStatus[] {
+  const byKey = new Map<string, DayStatus>();
+  for (const d of rows) {
+    if (!d.operator_id || !d.date) continue;
+    const prev = byKey.get(d.key);
+    if (!prev || d.updated_at >= prev.updated_at) byKey.set(d.key, d);
+  }
+  return [...byKey.values()].filter((d) => d.status);
 }
 
 export async function loadCatalogData(fresh = false): Promise<CatalogData> {
-  const r = await store().read(["operators", "activities", "blackouts"], fresh);
+  const r = await store().read(["operators", "activities", "blackouts", "days"], fresh);
   return {
     operators: (r.operators ?? []).map(toOperator).filter((o) => o.operator_id),
     activities: (r.activities ?? []).map(toActivity).filter((a) => a.activity_id),
     blackouts: (r.blackouts ?? []).map(toBlackout).filter((b) => b.operator_id && b.start_date),
+    days: latestDays((r.days ?? []).map(toDay)),
   };
+}
+
+/** All day rows incl. cleared ones (for sync bookkeeping). */
+export async function listAllDays(fresh = true): Promise<DayStatus[]> {
+  const r = await store().read(["days"], fresh);
+  return (r.days ?? []).map(toDay).filter((d) => d.operator_id && d.date);
+}
+
+/** Insert or overwrite day settings by key, in one round trip. */
+export async function upsertDays(rows: DayStatus[]): Promise<void> {
+  if (!rows.length) return;
+  await store().upsertMany("days", "key", rows as unknown as Record<string, unknown>[]);
 }
 
 export async function listBookings(fresh = false): Promise<Booking[]> {

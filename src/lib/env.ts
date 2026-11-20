@@ -44,6 +44,13 @@ export const env = {
   // ── Storage ─────────────────────────────────────────────────────────────
   sheetId: () => str("SHEET_ID"),
   serviceAccountJson: () => str("GOOGLE_SERVICE_ACCOUNT_JSON"),
+  /** OAuth refresh token of the Google user who owns the sheet (alternative to a service account). */
+  googleOAuth: (): { clientId: string; clientSecret: string; refreshToken: string } | null => {
+    const clientId = str("GOOGLE_OAUTH_CLIENT_ID");
+    const clientSecret = str("GOOGLE_OAUTH_CLIENT_SECRET");
+    const refreshToken = str("GOOGLE_OAUTH_REFRESH_TOKEN");
+    return clientId && clientSecret && refreshToken ? { clientId, clientSecret, refreshToken } : null;
+  },
   /**
    * "sheets" in production; "memory" (demo seed, not persisted) for local
    * dev/tests. Production never silently falls back to memory: it needs an
@@ -54,11 +61,28 @@ export const env = {
     const explicit = str("STORE");
     if (explicit === "memory" || explicit === "sheets") return explicit;
     if (process.env.NODE_ENV === "production") return "sheets";
-    return str("GOOGLE_SERVICE_ACCOUNT_JSON") && str("SHEET_ID") ? "sheets" : "memory";
+    const hasGoogle = !!str("GOOGLE_SERVICE_ACCOUNT_JSON") || !!env.googleOAuth();
+    return hasGoogle && str("SHEET_ID") ? "sheets" : "memory";
   },
 
   // ── Mail ────────────────────────────────────────────────────────────────
   resendKey: () => str("RESEND_API_KEY"),
+  /** SMTP (e.g. Gmail with an app password). Preferred over Resend when set. */
+  smtp: (): { host: string; port: number; secure: boolean; user: string; pass: string } | null => {
+    const user = str("SMTP_USER");
+    const pass = str("SMTP_PASS").replace(/\s+/g, ""); // Google shows app passwords in groups of four
+    if (!user || !pass) return null;
+    const port = num("SMTP_PORT", 465);
+    return { host: str("SMTP_HOST", "smtp.gmail.com"), port, secure: bool("SMTP_SECURE", port === 465), user, pass };
+  },
+  /** Which transport actually sends: SMTP if configured, else Resend, else none (log only). */
+  mailTransport: (): "smtp" | "resend" | "none" => {
+    const forced = str("MAIL_TRANSPORT").toLowerCase();
+    if (forced === "smtp") return env.smtp() ? "smtp" : "none";
+    if (forced === "resend") return str("RESEND_API_KEY") ? "resend" : "none";
+    if (env.smtp()) return "smtp";
+    return str("RESEND_API_KEY") ? "resend" : "none";
+  },
   mailMode: (): MailMode => {
     const m = str("MAIL_MODE", "log").toLowerCase();
     return (["log", "sandbox", "trial", "live"].includes(m) ? m : "log") as MailMode;

@@ -2,11 +2,11 @@
  * Check the spreadsheet: tabs, headers and row counts.
  *   npx tsx --conditions=react-server --env-file=.env.vercel scripts/verify-sheet.ts
  */
-import { inspectSpreadsheet, readTabs, serviceAccountEmail } from "@/lib/sheets";
+import { googleIdentity, inspectSpreadsheet, readTabs } from "@/lib/sheets";
 import { TABS, type TabKey } from "@/lib/schema";
 
 async function main() {
-  console.log(`Service account: ${serviceAccountEmail()}`);
+  console.log(`Google: ${googleIdentity()}`);
   const info = await inspectSpreadsheet();
   console.log(`Spreadsheet: ${info.title}`);
   let ok = true;

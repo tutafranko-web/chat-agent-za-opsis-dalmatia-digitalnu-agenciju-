@@ -6,7 +6,8 @@ import { appendBlackout, listBookings, findBooking, updateActivity } from "@/lib
 import { __resetMemoryStore, store } from "@/lib/store";
 import { getOffers } from "@/lib/catalog";
 import { signToken } from "@/lib/tokens";
-import { registerLandlord, registerOperator, decideOperator, addDayOff, getManageView } from "@/lib/partners";
+import { registerLandlord, registerOperator, decideOperator, getManageView } from "@/lib/partners";
+import { saveDaysWithToken } from "@/lib/availability";
 import { verifyToken } from "@/lib/tokens";
 
 const AT = new Date("2026-07-15T08:00:00Z"); // 10:00 in Zagreb → earliest 2026-07-16
@@ -131,8 +132,8 @@ describe("partners", () => {
     const manage = signToken("manage", { op: reg.operator_id, v: 1 }, 3600);
     expect(await getManageView(manage)).not.toBeNull();
     const today = new Date().toISOString().slice(0, 10);
-    expect(await addDayOff(manage, { start_date: today, end_date: today, reason: "weather" })).toMatchObject({ ok: true });
-    expect(await addDayOff(signToken("manage", { op: reg.operator_id, v: 2 }, 3600), { start_date: today, end_date: today, reason: "weather" })).toMatchObject({ ok: false, code: "invalid_token" });
+    expect(await saveDaysWithToken(manage, [{ dates: [today], status: "closed" }])).toMatchObject({ ok: true, saved: 1 });
+    expect(await saveDaysWithToken(signToken("manage", { op: reg.operator_id, v: 2 }, 3600), [{ dates: [today], status: "closed" }])).toMatchObject({ ok: false, code: "invalid_token" });
     expect(verifyToken("manage", approveToken)).toBeNull();
   });
 

@@ -1,10 +1,14 @@
 import "server-only";
+import nodemailer, { type Transporter } from "nodemailer";
 import { Resend } from "resend";
 import { env, type MailMode } from "./env";
 import { escapeHtml, isEmail, normalizeEmail } from "./sanitize";
 
 /**
- * Outgoing e-mail with mode-based routing (MAIL_MODE):
+ * Outgoing e-mail. Transport: SMTP when SMTP_USER/SMTP_PASS are set (Gmail
+ * with an app password works out of the box, no DNS needed), otherwise Resend.
+ *
+ * Mode-based routing (MAIL_MODE):
  *  - log:     nothing is sent; a one-line summary goes to the server log.
  *  - sandbox: everything goes to SANDBOX_TO (Resend delivers only to the
  *             account owner until the sending domain is verified).
@@ -69,6 +73,65 @@ function banner(original: string[]): string {
 }
 
 let resend: Resend | null = null;
+let smtp: Transporter | null = null;
+
+/** Gmail (and most SMTP hosts) only send as the signed-in address, so keep the display name and swap the address. */
+export function smtpFrom(mailFrom: string, user: string): string {
+  const addr = mailFrom.match(/<([^>]+)>/)?.[1] ?? (isEmail(mailFrom) ? mailFrom : "");
+  if (addr.toLowerCase() === user.toLowerCase()) return mailFrom;
+  const name = mailFrom.replace(/<[^>]*>/, "").replace(/"/g, "").trim() || "Opsis Dalmatia";
+  return `${name} <${user}>`;
+}
+
+// SMTP has no idempotency keys; remember recent keys per server instance so a retried request doesn't send twice.
+const recentKeys = new Map<string, number>();
+function seenRecently(key: string | undefined): boolean {
+  if (!key) return false;
+  const now = Date.now();
+  for (const [k, t] of recentKeys) if (now - t > 24 * 3600_000) recentKeys.delete(k);
+  if (recentKeys.has(key)) return true;
+  recentKeys.set(key, now);
+  return false;
+}
+
+async function sendViaSmtp(msg: MailMessage, to: string[], subject: string, html: string): Promise<{ id?: string }> {
+  const cfg = env.smtp();
+  if (!cfg) throw new Error("SMTP not configured");
+  smtp ??= nodemailer.createTransport({
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.secure,
+    auth: { user: cfg.user, pass: cfg.pass },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
+  });
+  const info = await smtp.sendMail({
+    from: smtpFrom(env.mailFrom(), cfg.user),
+    to,
+    replyTo: env.mailReplyTo(),
+    subject,
+    html,
+    text: msg.text,
+    headers: msg.headers,
+    attachments: msg.attachments?.map((a) => ({ filename: a.filename, content: a.content })),
+  });
+  return { id: info.messageId };
+}
+
+/** Health check: log in to the SMTP server without sending anything. */
+export async function verifySmtp(): Promise<{ ok: boolean; detail: string }> {
+  const cfg = env.smtp();
+  if (!cfg) return { ok: false, detail: "SMTP_USER / SMTP_PASS missing" };
+  try {
+    const t = nodemailer.createTransport({ host: cfg.host, port: cfg.port, secure: cfg.secure, auth: { user: cfg.user, pass: cfg.pass }, connectionTimeout: 8000, greetingTimeout: 8000 });
+    await t.verify();
+    t.close();
+    return { ok: true, detail: `${cfg.user} via ${cfg.host} (login OK)` };
+  } catch (err) {
+    return { ok: false, detail: `${cfg.user} via ${cfg.host}: ${(err as Error).message.slice(0, 140)}` };
+  }
+}
 
 export async function sendMail(msg: MailMessage): Promise<MailResult> {
   const mode = env.mailMode();
@@ -80,10 +143,24 @@ export async function sendMail(msg: MailMessage): Promise<MailResult> {
   const subjectPrefix = routed.rerouted ? (mode === "sandbox" ? "[SANDBOX] " : "[PROBA] ") : "";
   const html = routed.rerouted && msg.audience !== "admin" ? msg.html.replace("<!--BANNER-->", banner(original)) : msg.html;
   const subject = subjectPrefix + msg.subject;
+  const transport = env.mailTransport();
 
-  if (mode === "log" || !env.resendKey() || routed.to.length === 0) {
+  if (mode === "log" || transport === "none" || routed.to.length === 0) {
     console.log("[mail:log]", { tag: msg.tag, to: routed.to, original: routed.rerouted ? original : undefined, subject });
     return { ok: true, mode: "log", to: routed.to, rerouted: routed.rerouted };
+  }
+
+  if (transport === "smtp") {
+    if (seenRecently(msg.idempotencyKey)) return { ok: true, mode, to: routed.to, rerouted: routed.rerouted };
+    try {
+      const { id } = await sendViaSmtp(msg, routed.to, subject, html);
+      return { ok: true, mode, to: routed.to, rerouted: routed.rerouted, id };
+    } catch (err) {
+      if (msg.idempotencyKey) recentKeys.delete(msg.idempotencyKey);
+      smtp = null; // reconnect next time
+      console.error("[mail] smtp send failed", msg.tag, (err as Error).message);
+      return { ok: false, mode, to: routed.to, rerouted: routed.rerouted, error: (err as Error).message };
+    }
   }
 
   try {

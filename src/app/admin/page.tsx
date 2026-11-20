@@ -7,8 +7,9 @@ import { env } from "@/lib/env";
 import { healthChecks } from "@/lib/health";
 import { outreachCandidates, sendOutreach, type Audience } from "@/lib/outreach";
 import { listBookings, listLandlords, loadCatalogData } from "@/lib/repo";
+import { manageUrl } from "@/lib/partners";
 import { signToken } from "@/lib/tokens";
-import { formatDate, daysBetween, zagrebNow } from "@/lib/zagreb-time";
+import { addDays, formatDate, daysBetween, zagrebNow } from "@/lib/zagreb-time";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Admin", robots: { index: false, follow: false } };
@@ -59,6 +60,19 @@ export default async function AdminPage() {
   };
   const respondHref = (ref: string, op: string, date: string) =>
     `/r/${signToken("respond", { ref, op }, Math.max(2, daysBetween(today, date) + 2) * 86400)}`;
+  const in30 = addDays(today, 30);
+  const calendarOps = catalog.operators
+    .filter((o) => ["active", "demo", "paused"].includes(o.status))
+    .sort((a, b) => Number(a.status === "demo") - Number(b.status === "demo") || a.company.localeCompare(b.company))
+    .map((o) => ({
+      operator_id: o.operator_id,
+      company: o.company,
+      status: o.status,
+      ical_url: o.ical_url,
+      ical_status: o.ical_status,
+      marked: new Set(catalog.days.filter((d) => d.operator_id === o.operator_id && d.date >= today && d.date <= in30).map((d) => d.date)).size,
+      href: new URL(manageUrl(o)).pathname,
+    }));
   const preview = globalThis.__opsisOutreachPreview;
   const result = globalThis.__opsisOutreachResult;
 
@@ -115,6 +129,24 @@ export default async function AdminPage() {
               ))}
             </ul>
           )}
+        </section>
+
+        <section className="rounded-2xl border border-sand bg-white p-5">
+          <h2 className="mb-1 font-display text-[22px] font-semibold">Kalendari operatera</h2>
+          <p className="mb-3 text-[14px] text-body">Kad ti operater javi telefonom ili porukom da je pun, otvori njegov kalendar i dodirni dan (ili zalijepi njegovu poruku u „Napiši kao poruku”). Isti link dobiva on u svakom mailu.</p>
+          <details>
+            <summary className="cursor-pointer text-[14px] font-semibold text-sea-deep">Prikaži {calendarOps.length} operatera</summary>
+            <ul className="mt-2 divide-y divide-sand text-[14px]">
+              {calendarOps.map((o) => (
+                <li key={o.operator_id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <span>
+                    <strong>{o.company}</strong> <span className="text-body">· {o.status}{o.marked ? ` · ${o.marked} označenih dana (30 d)` : ""}{o.ical_url ? ` · kalendar: ${o.ical_status || "povezan"}` : ""}</span>
+                  </span>
+                  <Link className="font-semibold text-sea-deep underline" href={o.href} target="_blank" rel="noopener">Otvori kalendar</Link>
+                </li>
+              ))}
+            </ul>
+          </details>
         </section>
 
         <section className="rounded-2xl border border-sand bg-white p-5">

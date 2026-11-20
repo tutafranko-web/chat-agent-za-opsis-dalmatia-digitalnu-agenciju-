@@ -1,20 +1,20 @@
 import "server-only";
 import { z } from "zod";
 import { TERMS_VERSION } from "@/config/company";
+import { calendarData, operatorFromManageToken } from "./availability";
 import { env } from "./env";
-import { ACTIVITY_ID_RE, newActivityId, newLandlordId, newOperatorId, uniqueId } from "./ids";
+import { newActivityId, newLandlordId, newOperatorId, uniqueId } from "./ids";
 import { sendMail } from "./mail";
 import * as T from "./mail-templates";
 import { qrPngBuffer, qrDataUrl } from "./qr";
 import {
-  appendActivity, appendBlackout, appendLandlord, appendOperator, findOperator, listLandlords, listOperators,
+  appendActivity, appendLandlord, appendOperator, findOperator, listLandlords, listOperators,
   loadCatalogData, logEvent, updateActivity, updateOperator,
 } from "./repo";
 import { cleanPhone, cleanText, isEmail, isPhone, normalizeEmail, parseNumber, safeHttpsUrl } from "./sanitize";
 import type { Activity, Landlord, Operator } from "./schema";
 import { normalizeArea, TYPE_KEYS } from "./taxonomy";
 import { signToken, verifyToken } from "./tokens";
-import { addDays, daysBetween, isIsoDate, zagrebNow } from "./zagreb-time";
 
 type Lang = "en" | "hr";
 const text = (max: number, min = 0) => z.string().transform((s) => cleanText(s, max)).pipe(z.string().min(min));
@@ -163,6 +163,9 @@ export async function registerOperator(raw: unknown, lang: Lang) {
     approved_at: "",
     manage_version: 1,
     source: "form",
+    ical_url: "",
+    ical_synced_at: "",
+    ical_status: "",
   };
   await appendOperator(op);
   const { activities: existing } = await loadCatalogData(true);
@@ -235,60 +238,17 @@ export async function decideOperator(token: unknown, decision: unknown) {
 // ── Operator self-service (manage link) ────────────────────────────────────
 
 export async function getManageView(token: string) {
-  const v = verifyToken<{ op: string; v: number }>("manage", token);
-  if (!v) return null;
-  const { operators, activities, blackouts } = await loadCatalogData(true);
-  const op = operators.find((o) => o.operator_id === v.data.op);
-  if (!op || op.manage_version !== v.data.v || (op.status !== "active" && op.status !== "demo" && op.status !== "paused")) return null;
-  const today = zagrebNow().date;
+  const m = await operatorFromManageToken(token);
+  if (!m.ok) return null;
+  const op = m.op;
+  const { activities } = await loadCatalogData(true);
   return {
     operator: { operator_id: op.operator_id, company: op.company, status: op.status },
     activities: activities
       .filter((a) => a.operator_id === op.operator_id)
-      .map((a) => ({ activity_id: a.activity_id, title: a.title, status: a.status, image_url: a.image_url, gallery_url: a.gallery_url })),
-    blackouts: blackouts
-      .filter((b) => b.operator_id === op.operator_id && daysBetween(today, b.end_date) >= 0)
-      .map((b) => ({ start_date: b.start_date, end_date: b.end_date, activity_id: b.activity_id, reason: b.reason })),
+      .map((a) => ({ activity_id: a.activity_id, title: a.title, status: a.status, image_url: a.image_url, gallery_url: a.gallery_url, max_per_day: a.max_per_day })),
+    calendar: await calendarData(op),
   };
-}
-
-const DayOffInput = z.object({
-  start_date: z.string().refine(isIsoDate, "start_date"),
-  end_date: z.string().refine(isIsoDate, "end_date"),
-  activity_id: z.string().optional().default("").refine((s) => s === "" || ACTIVITY_ID_RE.test(s) || /^A-DEM\d{3}$/.test(s), "activity_id"),
-  reason: z.enum(["weather", "maintenance", "full", "holiday", "private", "other"]),
-  notes: z.string().optional().default("").transform((s) => cleanText(s, 300)),
-});
-
-export async function addDayOff(token: unknown, raw: unknown) {
-  const v = verifyToken<{ op: string; v: number }>("manage", token);
-  if (!v) return { ok: false as const, code: "invalid_token" };
-  const op = await findOperator(v.data.op, true);
-  if (!op || op.manage_version !== v.data.v) return { ok: false as const, code: "invalid_token" };
-  const p = DayOffInput.safeParse(raw);
-  if (!p.success) return { ok: false as const, code: "validation", field: String(p.error.issues[0]?.message ?? "") };
-  const d = p.data;
-  const today = zagrebNow().date;
-  if (daysBetween(d.start_date, d.end_date) < 0) return { ok: false as const, code: "validation", field: "end_before_start" };
-  if (daysBetween(today, d.end_date) < 0) return { ok: false as const, code: "validation", field: "in_past" };
-  if (daysBetween(d.start_date, d.end_date) > 180 || daysBetween(today, d.start_date) > 400) return { ok: false as const, code: "validation", field: "too_long" };
-  if (d.activity_id) {
-    const { activities } = await loadCatalogData(true);
-    if (!activities.some((a) => a.activity_id === d.activity_id && a.operator_id === op.operator_id)) {
-      return { ok: false as const, code: "validation", field: "activity_id" };
-    }
-  }
-  await appendBlackout({
-    operator_id: op.operator_id,
-    activity_id: d.activity_id,
-    start_date: d.start_date,
-    end_date: d.end_date,
-    reason: d.reason,
-    notes: d.notes,
-    created_at: new Date().toISOString(),
-  });
-  await logEvent("info", "dayoff_added", op.operator_id, `${d.start_date}..${d.end_date}`);
-  return { ok: true as const };
 }
 
 export async function updatePhotos(token: unknown, raw: unknown) {
@@ -308,10 +268,4 @@ export async function updatePhotos(token: unknown, raw: unknown) {
   await updateActivity(act.activity_id, { image_url: image ?? "", gallery_url: gallery ?? "" });
   await logEvent("info", "photos_updated", act.activity_id);
   return { ok: true as const };
-}
-
-/** Earliest/latest dates for the day-off form. */
-export function dayOffBounds() {
-  const today = zagrebNow().date;
-  return { min: today, max: addDays(today, 400) };
 }

@@ -118,25 +118,36 @@ export function touristDeclined(b: Booking, lang: L, note: string, chatUrl: stri
 
 // ── Operator & admin: booking requests ─────────────────────────────────────
 
-export function operatorNewRequest(b: Booking, respondUrl: string): Mail {
+function calendarHint(calendarUrl: string): string {
+  return p(`<span style="font-size:14px">Pun si ili ne radiš neke dane? <a href="${e(calendarUrl)}" style="color:#0B6E6D;font-weight:700">Otvori svoj kalendar</a> i dodirni dan. Gosti tada te dane ne traže.</span>`);
+}
+
+export function operatorNewRequest(b: Booking, respondUrl: string, calendarUrl: string): Mail {
   const title = "Novi zahtjev za rezervaciju";
   const rows = bookingRows(b, "hr", { operator: false, contact: true });
   const inner =
     p(`Gost je preko Opsis Concierge poslao zahtjev za <strong>${e(b.activity_title)}</strong>. Molimo potvrdite ili odbijte, idealno unutar 24 sata. Gost tek tada dobiva potvrdu.`) +
     table(rows) +
     button(respondUrl, "Potvrdi ili odbij") +
-    p(`<span style="font-size:13px;color:#6B7378">New booking request via Opsis Concierge. Please confirm or decline using the button above.</span>`);
-  return { subject: `Novi zahtjev ${b.ref}: ${b.activity_title}, ${formatDate(b.date, "hr")}`, html: layout("hr", title, inner, b.ref), text: `${title}\n\n${textTable(rows)}\n\nPotvrdi ili odbij: ${respondUrl}` };
+    calendarHint(calendarUrl) +
+    p(`<span style="font-size:13px;color:#6B7378">New booking request via Opsis Concierge. Please confirm or decline using the button above. Fully booked or closed on some days? Open your calendar link and tap the day.</span>`);
+  return {
+    subject: `Novi zahtjev ${b.ref}: ${b.activity_title}, ${formatDate(b.date, "hr")}`,
+    html: layout("hr", title, inner, b.ref),
+    text: `${title}\n\n${textTable(rows)}\n\nPotvrdi ili odbij: ${respondUrl}\n\nTvoj kalendar (pun / ne radim): ${calendarUrl}`,
+  };
 }
 
-export function adminNewRequest(b: Booking, respondUrl: string, partnerRouting: string): Mail {
+export function adminNewRequest(b: Booking, respondUrl: string, partnerRouting: string, calendarUrl?: string): Mail {
   const title = `Novi zahtjev ${b.ref}`;
   const rows = bookingRows(b, "hr", { contact: true, money: true });
   if (b.landlord_id) rows.push(["Iznajmljivač", e(b.landlord_id)]);
   if (b.area) rows.push(["Područje", e(b.area)]);
   rows.push(["Izvor", e(b.source)]);
-  const inner = p(e(partnerRouting)) + table(rows) + button(respondUrl, "Otvori potvrdu / odbijanje");
-  return { subject: `[Opsis] ${title}: ${b.activity_title}`, html: layout("hr", title, inner, b.ref), text: `${title}\n\n${textTable(rows)}\n\n${respondUrl}` };
+  const inner =
+    p(e(partnerRouting)) + table(rows) + button(respondUrl, "Otvori potvrdu / odbijanje") +
+    (calendarUrl ? p(`<span style="font-size:14px">Kalendar operatera (upiši za njega ako ti javi telefonom): <a href="${e(calendarUrl)}" style="color:#0B6E6D;font-weight:700">otvori</a></span>`) : "");
+  return { subject: `[Opsis] ${title}: ${b.activity_title}`, html: layout("hr", title, inner, b.ref), text: `${title}\n\n${textTable(rows)}\n\n${respondUrl}${calendarUrl ? `\n\nKalendar operatera: ${calendarUrl}` : ""}` };
 }
 
 export function adminBookingResponded(b: Booking): Mail {
@@ -176,9 +187,9 @@ export function operatorApproved(o: Operator, manageUrl: string): Mail {
   const title = "Vaša ponuda je objavljena";
   const inner =
     p(`Poštovani ${e(o.contact_person)}, ponuda tvrtke <strong>${e(o.company)}</strong> sada je vidljiva gostima u Opsis Concierge.`) +
-    p("Zahtjeve za rezervaciju dobivat ćete mailom s gumbima Potvrdi / Odbij. Preko osobne poveznice možete blokirati neradne dane i dodati fotografije. Poveznicu nemojte prosljeđivati.") +
-    button(manageUrl, "Upravljanje ponudom") +
-    p(`<span style="font-size:13px;color:#6B7378">Your listing is live. Use the personal link above to block days off and add photos.</span>`);
+    p("Zahtjeve za rezervaciju dobivat ćete mailom s gumbima Potvrdi / Odbij. Sve dane smatramo slobodnima dok ne kažete drugačije. Kad ste puni ili ne radite, otvorite svoj kalendar i dodirnite dan, ili napišite rečenicu, npr. „sutra pun, subota još 4 mjesta”. Ako imate Google kalendar ili sustav za rezervacije, možete ga i povezati. Poveznicu nemojte prosljeđivati.") +
+    button(manageUrl, "Otvori moj kalendar") +
+    p(`<span style="font-size:13px;color:#6B7378">Your listing is live. Every day counts as available until you say otherwise: open your calendar to mark full or closed days, link your existing calendar, or add photos.</span>`);
   return { subject: "Ponuda je objavljena · Opsis Concierge", html: layout("hr", title, inner), text: `${title}\n\n${manageUrl}` };
 }
 

@@ -3,7 +3,7 @@
  * Europe/Zagreb.
  */
 import { round2 } from "./sanitize";
-import type { Blackout, Booking } from "./schema";
+import type { Blackout, Booking, DayStatus } from "./schema";
 import { addDays, daysBetween, isIsoDate, zagrebNow } from "./zagreb-time";
 
 export const CUTOFF_HOUR = 15; // requests for tomorrow close at 15:00 Zagreb time
@@ -89,11 +89,32 @@ export function blackoutFor(blackouts: Blackout[], operatorId: string, activityI
   return null;
 }
 
-/** People already requested/booked for that day (pending + confirmed). */
-export function peopleBooked(bookings: Booking[], scope: { activityId?: string; operatorId?: string }, date: string): number {
+/**
+ * The operator's own word for that day, if any: an activity-specific row wins
+ * over an operator-wide one. `days` must already be de-duplicated (latest row
+ * per key) — see repo.loadCatalogData.
+ */
+export function dayOverride(days: DayStatus[], operatorId: string, activityId: string, date: string): DayStatus | null {
+  let operatorWide: DayStatus | null = null;
+  for (const d of days) {
+    if (d.operator_id !== operatorId || d.date !== date || !d.status) continue;
+    if (d.activity_id === activityId) return d;
+    if (!d.activity_id) operatorWide = d;
+  }
+  return operatorWide;
+}
+
+/** People already requested/booked for that day (pending + confirmed), optionally only requests made after `since`. */
+export function peopleBooked(
+  bookings: Booking[],
+  scope: { activityId?: string; operatorId?: string },
+  date: string,
+  since = "",
+): number {
   return bookings
     .filter((b) => b.date === date && (b.status === "pending" || b.status === "confirmed"))
     .filter((b) => (scope.activityId ? b.activity_id === scope.activityId : b.operator_id === scope.operatorId))
+    .filter((b) => !since || b.created_at > since)
     .reduce((sum, b) => sum + b.adults + b.children, 0);
 }
 
@@ -101,9 +122,15 @@ export type Availability =
   | { ok: true; spotsLeft: number | null }
   | { ok: false; code: "blackout" | "full"; reason?: string; spotsLeft?: number };
 
+/**
+ * Order: the operator's day setting (closed / full / "N seats left" / open)
+ * → day-off ranges → daily capacity. Everything stays a *request* that the
+ * operator confirms, so this only stops requests we already know will fail.
+ */
 export function availability(
   opts: {
     blackouts: Blackout[];
+    days?: DayStatus[];
     bookings: Booking[];
     operatorId: string;
     activityId: string;
@@ -113,8 +140,24 @@ export function availability(
   date: string,
   people: number,
 ): Availability {
-  const bo = blackoutFor(opts.blackouts, opts.operatorId, opts.activityId, date);
-  if (bo) return { ok: false, code: "blackout", reason: bo.reason };
+  const ov = dayOverride(opts.days ?? [], opts.operatorId, opts.activityId, date);
+  if (ov?.status === "closed") return { ok: false, code: "blackout", reason: ov.note || "closed" };
+  if (ov?.status === "full") return { ok: false, code: "full", spotsLeft: 0 };
+  if (ov?.status === "open" && ov.seats !== null) {
+    const used = peopleBooked(
+      opts.bookings,
+      ov.activity_id ? { activityId: opts.activityId } : { operatorId: opts.operatorId },
+      date,
+      ov.updated_at,
+    );
+    const left = Math.max(0, ov.seats) - used;
+    if (left < people) return { ok: false, code: "full", spotsLeft: Math.max(0, left) };
+    return { ok: true, spotsLeft: left };
+  }
+  if (!ov) {
+    const bo = blackoutFor(opts.blackouts, opts.operatorId, opts.activityId, date);
+    if (bo) return { ok: false, code: "blackout", reason: bo.reason };
+  }
   if (opts.maxPerDay && opts.maxPerDay > 0) {
     const used = peopleBooked(
       opts.bookings,

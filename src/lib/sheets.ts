@@ -1,5 +1,5 @@
 import "server-only";
-import { JWT } from "google-auth-library";
+import { JWT, OAuth2Client } from "google-auth-library";
 import { sheets, type sheets_v4 } from "@googleapis/sheets";
 import { env } from "./env";
 import { sheetSafe } from "./sanitize";
@@ -13,34 +13,58 @@ import { TABS, type Row, type TabKey } from "./schema";
 
 let client: sheets_v4.Sheets | null = null;
 
+/**
+ * Two ways to sign in:
+ *  1. Service account (GOOGLE_SERVICE_ACCOUNT_JSON): the sheet is shared
+ *     with its client_email and it sees nothing else.
+ *  2. OAuth refresh token of a Google user (GOOGLE_OAUTH_CLIENT_ID/_SECRET/
+ *     _REFRESH_TOKEN): acts as that user, so it can open every spreadsheet
+ *     the user can. Quicker to set up; the service account is the tighter
+ *     option and wins when both are set.
+ */
 function api(): sheets_v4.Sheets {
   if (client) return client;
   const raw = env.serviceAccountJson();
-  if (!raw) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set");
-  let creds: { client_email?: string; private_key?: string };
-  try {
-    creds = JSON.parse(raw);
-  } catch {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON");
+  if (raw) {
+    let creds: { client_email?: string; private_key?: string };
+    try {
+      creds = JSON.parse(raw);
+    } catch {
+      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON");
+    }
+    if (!creds.client_email || !creds.private_key) {
+      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON must contain client_email and private_key");
+    }
+    const auth = new JWT({
+      email: creds.client_email,
+      key: creds.private_key.replace(/\\n/g, "\n"),
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+    client = sheets({ version: "v4", auth });
+    return client;
   }
-  if (!creds.client_email || !creds.private_key) {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON must contain client_email and private_key");
+  const o = env.googleOAuth();
+  if (o) {
+    const auth = new OAuth2Client({ clientId: o.clientId, clientSecret: o.clientSecret });
+    auth.setCredentials({ refresh_token: o.refreshToken });
+    client = sheets({ version: "v4", auth });
+    return client;
   }
-  const auth = new JWT({
-    email: creds.client_email,
-    key: creds.private_key.replace(/\\n/g, "\n"),
-    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-  });
-  client = sheets({ version: "v4", auth });
-  return client;
+  throw new Error("No Google credentials: set GOOGLE_SERVICE_ACCOUNT_JSON or GOOGLE_OAUTH_CLIENT_ID/_SECRET/_REFRESH_TOKEN");
 }
 
-export function serviceAccountEmail(): string | null {
-  try {
-    return (JSON.parse(env.serviceAccountJson()) as { client_email?: string }).client_email ?? null;
-  } catch {
-    return null;
+/** Who the app signs in to Google as (for health/setup output). */
+export function googleIdentity(): string | null {
+  const raw = env.serviceAccountJson();
+  if (raw) {
+    try {
+      const email = (JSON.parse(raw) as { client_email?: string }).client_email;
+      return email ? `service account ${email}` : null;
+    } catch {
+      return null;
+    }
   }
+  return env.googleOAuth() ? "OAuth (Google račun vlasnika tablice)" : null;
 }
 
 function sheetId(): string {
@@ -192,6 +216,51 @@ export async function updateRecord(
   );
   invalidate(tab);
   return true;
+}
+
+/**
+ * Overwrite every row whose `keyField` equals a record's key and append the
+ * rest: one read and at most two writes, whatever the number of records.
+ */
+export async function upsertMany(tab: TabKey, keyField: string, records: Record<string, unknown>[]): Promise<void> {
+  if (!records.length) return;
+  const rows = (await readTabs([tab], true))[tab];
+  const headers = await headersOf(tab);
+  const lastCol = colLetter(Math.max(0, headers.length - 1));
+  const rowOf = new Map<string, number>();
+  for (const r of rows) rowOf.set((r[keyField] ?? "").replace(/^'/, "").trim(), Number(r.__row));
+  const updates: { range: string; values: unknown[][] }[] = [];
+  const appends: unknown[][] = [];
+  const seen = new Set<string>();
+  for (const rec of records) {
+    const key = String(rec[keyField] ?? "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const line = headers.map((h) => (h in rec ? sheetSafe(rec[h]) : ""));
+    const n = rowOf.get(key);
+    if (n) updates.push({ range: `'${TABS[tab].name}'!A${n}:${lastCol}${n}`, values: [line] });
+    else appends.push(line);
+  }
+  if (updates.length) {
+    await withBackoff(
+      () => api().spreadsheets.values.batchUpdate({ spreadsheetId: sheetId(), requestBody: { valueInputOption: "RAW", data: updates } }),
+      `upsert/update ${tab}`,
+    );
+  }
+  if (appends.length) {
+    await withBackoff(
+      () =>
+        api().spreadsheets.values.append({
+          spreadsheetId: sheetId(),
+          range: `'${TABS[tab].name}'!A1`,
+          valueInputOption: "RAW",
+          insertDataOption: "INSERT_ROWS",
+          requestBody: { values: appends },
+        }),
+      `upsert/append ${tab}`,
+    );
+  }
+  invalidate(tab);
 }
 
 /** Health/setup helper: which tabs exist and what their header rows are. */

@@ -18,7 +18,8 @@ export const LIMITS = {
   confirm: { name: "confirm", max: 8, windowMs: 60 * 60_000 },
   form: { name: "form", max: 6, windowMs: 60 * 60_000 },
   quiz: { name: "quiz", max: 12, windowMs: 60 * 60_000 },
-  partner: { name: "partner", max: 30, windowMs: 60 * 60_000 },
+  partner: { name: "partner", max: 60, windowMs: 60 * 60_000 },
+  partnerAi: { name: "partner-ai", max: 15, windowMs: 60 * 60_000 },
   respond: { name: "respond", max: 30, windowMs: 60 * 60_000 },
   admin: { name: "admin", max: 60, windowMs: 10 * 60_000 },
 } satisfies Record<string, Limit>;

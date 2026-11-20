@@ -15,6 +15,8 @@ export interface DataStore {
   read(tabs: TabKey[], fresh?: boolean): Promise<Record<string, Row[]>>;
   append(tab: TabKey, record: Record<string, unknown>): Promise<void>;
   update(tab: TabKey, keyField: string, keyValue: string, patch: Record<string, unknown>): Promise<boolean>;
+  /** Overwrite rows whose `keyField` matches, append the rest. */
+  upsertMany(tab: TabKey, keyField: string, records: Record<string, unknown>[]): Promise<void>;
 }
 
 function toRow(tab: TabKey, record: Record<string, unknown>): Row {
@@ -39,18 +41,27 @@ class MemoryStore implements DataStore {
   }
 
   async read(tabs: TabKey[]): Promise<Record<string, Row[]>> {
-    return Object.fromEntries(tabs.map((t) => [t, this.data[t].map((r) => ({ ...r }))]));
+    return Object.fromEntries(tabs.map((t) => [t, (this.data[t] ?? []).map((r) => ({ ...r }))]));
   }
 
   async append(tab: TabKey, record: Record<string, unknown>): Promise<void> {
-    this.data[tab].push(toRow(tab, record));
+    (this.data[tab] ??= []).push(toRow(tab, record));
   }
 
   async update(tab: TabKey, keyField: string, keyValue: string, patch: Record<string, unknown>): Promise<boolean> {
-    const row = this.data[tab].find((r) => (r[keyField] ?? "").replace(/^'/, "") === keyValue);
+    const row = (this.data[tab] ??= []).find((r) => (r[keyField] ?? "").replace(/^'/, "") === keyValue);
     if (!row) return false;
     for (const [k, v] of Object.entries(patch)) row[k] = v === undefined || v === null ? "" : String(sheetSafe(v));
     return true;
+  }
+
+  async upsertMany(tab: TabKey, keyField: string, records: Record<string, unknown>[]): Promise<void> {
+    for (const rec of records) {
+      const key = String(rec[keyField] ?? "");
+      const idx = (this.data[tab] ??= []).findIndex((r) => (r[keyField] ?? "").replace(/^'/, "") === key);
+      if (idx >= 0) this.data[tab][idx] = toRow(tab, rec);
+      else this.data[tab].push(toRow(tab, rec));
+    }
   }
 
   /** Test helper. */
@@ -70,6 +81,9 @@ class SheetsStore implements DataStore {
   }
   update(tab: TabKey, keyField: string, keyValue: string, patch: Record<string, unknown>) {
     return gs.updateRecord(tab, keyField, keyValue, patch);
+  }
+  upsertMany(tab: TabKey, keyField: string, records: Record<string, unknown>[]) {
+    return gs.upsertMany(tab, keyField, records);
   }
 }
 
