@@ -1,0 +1,7 @@
+.env*
+!.env.example
+*.local.txt
+.next
+node_modules
+.outbox
+coverage
