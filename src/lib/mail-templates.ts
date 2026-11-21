@@ -54,8 +54,19 @@ function table(rows: [string, string][]): string {
     .join("")}</table>`;
 }
 
+/** Escaped HTML fragment → plain text for the text/plain part (tags out, entities back). */
+function plain(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 function textTable(rows: [string, string][]): string {
-  return rows.map(([k, v]) => `${k}: ${v.replace(/<[^>]+>/g, "")}`).join("\n");
+  return rows.map(([k, v]) => `${k}: ${plain(v)}`).join("\n");
 }
 
 function party(b: Booking, lang: L): string {
@@ -92,7 +103,7 @@ export function touristRequestReceived(b: Booking, lang: L): Mail {
       : `Thank you, ${e(b.tourist_name)}! The organiser is now checking availability. You'll get a confirmation e-mail, usually within 24 hours. Payment is arranged directly with the organiser.`;
   const rows = bookingRows(b, lang);
   const html = layout(lang, title, p(intro) + table(rows) + p(lang === "hr" ? "Ako ne vidite odgovor, provjerite i mapu neželjene pošte." : "If you don't see our reply, please check your spam folder."), b.ref);
-  return { subject: `${title} · ${b.ref}`, html, text: `${title}\n\n${intro.replace(/<[^>]+>/g, "")}\n\n${textTable(rows)}` };
+  return { subject: `${title} · ${b.ref}`, html, text: `${title}\n\n${plain(intro)}\n\n${textTable(rows)}` };
 }
 
 export function touristConfirmed(b: Booking, lang: L, meetingPoint: string, note: string): Mail {

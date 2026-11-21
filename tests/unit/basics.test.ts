@@ -114,3 +114,20 @@ describe("taxonomy and demo data", () => {
     }
   });
 });
+
+describe("mail templates", () => {
+  it("keeps the HTML part escaped and the text part readable", async () => {
+    const { touristRequestReceived } = await import("@/lib/mail-templates");
+    const b = {
+      ref: "OPS-TEST01", activity_title: "Sea kayak & caves", operator_name: "Kayak <Split>", tourist_name: "Ana O'Brien",
+      date: "2026-12-03", adults: 2, children: 0, total_eur: 90,
+    } as unknown as import("@/lib/schema").Booking;
+    const m = touristRequestReceived(b, "hr");
+    expect(m.html).toContain("Sea kayak &amp; caves");
+    expect(m.html).not.toContain("Kayak <Split>");
+    expect(m.text).toContain("Aktivnost: Sea kayak & caves");
+    expect(m.text).toContain("Organizator: Kayak <Split>");
+    expect(m.text).toContain("Hvala, Ana O'Brien!");
+    expect(m.text).not.toMatch(/&amp;|&#39;|&lt;/);
+  });
+});
